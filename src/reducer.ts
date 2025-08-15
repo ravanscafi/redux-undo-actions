@@ -8,26 +8,9 @@ export default function undoableActions<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   customConfig?: Partial<UndoableActionsConfig>,
 ): Reducer<HistoryState<State, Action>, Action> {
-  const config: UndoableActionsConfig = {
-    undoActionType: ActionTypes.Undo,
-    redoActionType: ActionTypes.Redo,
-    hydrateActionType: ActionTypes.Hydrate,
-    undoableActionTypes: [],
-    trackedActionTypes: [],
-    ...customConfig,
-  }
-  const originalInitialState = reducer(undefined, {} as Action)
-  const initialState = {
-    present: originalInitialState,
-    history: {
-      tracking: config.trackAfterActionType === undefined,
-      past: [],
-      future: [],
-      snapshot: originalInitialState,
-    },
-    canUndo: false,
-    canRedo: false,
-  }
+  const config = getConfig(customConfig)
+  const initialState = getInitialState(reducer, config)
+
   return function (state, action) {
     if (!state) {
       return initialState
@@ -47,6 +30,38 @@ export default function undoableActions<State, Action extends UnknownAction>(
       default:
         return handle(reducer, config, state, action)
     }
+  }
+}
+
+function getConfig(
+  customConfig?: Partial<UndoableActionsConfig>,
+): UndoableActionsConfig {
+  return {
+    undoActionType: ActionTypes.Undo,
+    redoActionType: ActionTypes.Redo,
+    hydrateActionType: ActionTypes.Hydrate,
+    undoableActionTypes: [],
+    trackedActionTypes: [],
+    ...customConfig,
+  }
+}
+
+function getInitialState<State, Action extends UnknownAction>(
+  reducer: Reducer<State, Action>,
+  config: UndoableActionsConfig,
+): HistoryState<State, Action> {
+  const initialPresent = reducer(undefined, {} as Action)
+
+  return {
+    present: initialPresent,
+    history: {
+      tracking: config.trackAfterActionType === undefined,
+      past: [],
+      future: [],
+      snapshot: initialPresent,
+    },
+    canUndo: false,
+    canRedo: false,
   }
 }
 

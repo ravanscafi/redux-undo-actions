@@ -78,21 +78,23 @@ function undo<State, Action extends UnknownAction>(
     history.snapshot,
   )
 
+  const newFuture = [
+    {
+      action: undoneAction,
+      index: lastUndoableIndex,
+    },
+    ...future,
+  ]
+
   return {
     history: {
       ...history,
       past: newPast,
-      future: [
-        {
-          action: undoneAction,
-          index: lastUndoableIndex,
-        },
-        ...future,
-      ],
+      future: newFuture,
     },
     present: replayedState,
     canUndo: canUndo(config, newPast),
-    canRedo: true,
+    canRedo: canRedo(config, newFuture),
   }
 }
 
@@ -131,7 +133,7 @@ function redo<State, Action extends UnknownAction>(
     },
     present: newPresent,
     canUndo: canUndo(config, newPast),
-    canRedo: newFuture.length > 0,
+    canRedo: canRedo(config, newFuture),
   }
 }
 
@@ -164,7 +166,7 @@ function hydrate<State, Action extends UnknownAction>(
     },
     present: newPresent,
     canUndo: canUndo(config, past),
-    canRedo: future.length > 0,
+    canRedo: canRedo(config, future),
   }
 }
 
@@ -194,7 +196,7 @@ function handle<State, Action extends UnknownAction>(
   action: Action,
 ): HistoryState<State, Action> {
   const { history, present } = state
-  const { past, tracking } = history
+  const { past, future, tracking } = history
 
   const newPresent = reducer(present, action)
 
@@ -210,22 +212,23 @@ function handle<State, Action extends UnknownAction>(
   }
 
   const newPast = [...past, action]
+  const newFuture = isActionUndoable(config, action) ? [] : future
 
   return {
     history: {
       ...history,
       past: newPast,
-      future: [],
+      future: newFuture,
     },
     present: newPresent,
     canUndo: canUndo(config, newPast),
-    canRedo: false,
+    canRedo: canRedo(config, newFuture),
   }
 }
 
-function canUndo(
+function canUndo<State, Action extends UnknownAction>(
   config: UndoableActionsConfig,
-  past: UnknownAction[],
+  past: History<State, Action>['past'],
 ): boolean {
   if (past.length === 0) {
     return false
@@ -233,7 +236,24 @@ function canUndo(
 
   return (
     config.undoableActionTypes.length === 0 ||
-    past.some((a: UnknownAction) => config.undoableActionTypes.includes(a.type))
+    past.some((a: Action) => config.undoableActionTypes.includes(a.type))
+  )
+}
+
+function canRedo<State, Action extends UnknownAction>(
+  _: UndoableActionsConfig,
+  future: History<State, Action>['future'],
+): boolean {
+  return future.length > 0
+}
+
+function isActionUndoable(
+  config: UndoableActionsConfig,
+  action: UnknownAction,
+): boolean {
+  return (
+    config.undoableActionTypes.length === 0 ||
+    config.undoableActionTypes.includes(action.type)
   )
 }
 

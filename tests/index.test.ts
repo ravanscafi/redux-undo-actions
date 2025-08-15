@@ -161,6 +161,7 @@ describe('undoableActions', () => {
     expect(store.getState().canRedo).toStrictEqual(false)
     expect(store.getState().history.future.length).toStrictEqual(0)
   })
+
   it('hydrates state with past and future actions', () => {
     const store = createStore(undoableActions(baseReducer))
 
@@ -387,5 +388,46 @@ describe('undoableActions with custom config', () => {
     expect(store.getState().present.name).toStrictEqual('Counter')
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(true)
+  })
+
+  it('should not clear future if an action is not undoable', () => {
+    const store = createStore(
+      undoableActions(baseReducer, {
+        trackedActionTypes: ['counter/increment', 'counter/change-name'],
+        undoableActionTypes: ['counter/increment'],
+      }),
+    )
+
+    store.dispatch({ type: 'counter/increment' })
+    store.dispatch({ type: 'counter/increment', payload: 2 })
+    expect(store.getState().present.count).toStrictEqual(3)
+    expect(store.getState().history.past).toStrictEqual([
+      { type: 'counter/increment' },
+      { type: 'counter/increment', payload: 2 },
+    ])
+    expect(store.getState().history.future).toStrictEqual([])
+
+    store.dispatch(ActionCreators.undo())
+    expect(store.getState().present.count).toStrictEqual(1)
+    expect(store.getState().canUndo).toStrictEqual(true)
+    expect(store.getState().canRedo).toStrictEqual(true)
+    expect(store.getState().history.past).toStrictEqual([
+      { type: 'counter/increment' },
+    ])
+    expect(store.getState().history.future).toStrictEqual([
+      { action: { type: 'counter/increment', payload: 2 }, index: 1 },
+    ])
+
+    store.dispatch({ type: 'counter/change-name', payload: 'The new name' })
+    expect(store.getState().present.name).toStrictEqual('The new name')
+    expect(store.getState().history.past).toStrictEqual([
+      { type: 'counter/increment' },
+      { type: 'counter/change-name', payload: 'The new name' },
+    ])
+    expect(store.getState().canUndo).toStrictEqual(true)
+    expect(store.getState().canRedo).toStrictEqual(true)
+    expect(store.getState().history.future).toStrictEqual([
+      { action: { type: 'counter/increment', payload: 2 }, index: 1 },
+    ])
   })
 })

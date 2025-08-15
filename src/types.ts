@@ -18,6 +18,7 @@ export interface HistoryState<State, Action extends UnknownAction> {
 }
 
 export interface UndoableActionsConfig {
+  trackedActionTypes: UnknownAction['type'][]
   undoableActionTypes: UnknownAction['type'][]
   undoActionType: UnknownAction['type']
   redoActionType: UnknownAction['type']

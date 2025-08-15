@@ -8,11 +8,12 @@ export default function undoableActions<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   customConfig?: Partial<UndoableActionsConfig>,
 ): Reducer<HistoryState<State, Action>, Action> {
-  const config = {
+  const config: UndoableActionsConfig = {
     undoActionType: ActionTypes.Undo,
     redoActionType: ActionTypes.Redo,
     hydrateActionType: ActionTypes.Hydrate,
     undoableActionTypes: [],
+    trackedActionTypes: [],
     ...customConfig,
   }
   const originalInitialState = reducer(undefined, {} as Action)
@@ -197,7 +198,11 @@ function handle<State, Action extends UnknownAction>(
 
   const newPresent = reducer(present, action)
 
-  if (!tracking || deepEqual(newPresent, present)) {
+  if (
+    !tracking ||
+    !isActionTracked(config, action) ||
+    deepEqual(newPresent, present) // no change in state
+  ) {
     return {
       ...state,
       present: newPresent,
@@ -229,5 +234,15 @@ function canUndo(
   return (
     config.undoableActionTypes.length === 0 ||
     past.some((a: UnknownAction) => config.undoableActionTypes.includes(a.type))
+  )
+}
+
+function isActionTracked(
+  config: UndoableActionsConfig,
+  action: UnknownAction,
+): boolean {
+  return (
+    config.trackedActionTypes.length === 0 ||
+    config.trackedActionTypes.includes(action.type)
   )
 }

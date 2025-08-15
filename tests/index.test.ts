@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { UnknownAction } from 'redux'
 import { legacy_createStore as createStore } from 'redux'
-import undoableActions, { ActionCreators } from '../src'
+import undoableActions, { ActionCreators, ActionTypes } from '../src'
 
 const baseReducer = (
   state = { name: 'Counter', count: 0 },
@@ -226,7 +226,7 @@ describe('undoableActions', () => {
 })
 
 describe('undoableActions with custom config', () => {
-  it('should initialize with default state', () => {
+  it('should only track actions when the state changes', () => {
     const store = createStore(
       undoableActions(baseReducer, {
         undoableActionTypes: ['counter/increment', 'counter/decrement'],
@@ -287,5 +287,105 @@ describe('undoableActions with custom config', () => {
     expect(store.getState().present.name).toStrictEqual('New Counter Name')
     expect(store.getState().canUndo).toStrictEqual(true)
     expect(store.getState().canRedo).toStrictEqual(false)
+  })
+
+  it('should only track tracked-actions when config is set', () => {
+    const store = createStore(
+      undoableActions(baseReducer, {
+        trackedActionTypes: [
+          'counter/increment',
+          'counter/decrement',
+          'counter/change-name',
+        ],
+        undoableActionTypes: ['counter/increment', 'counter/decrement'],
+        trackAfterActionType: 'counter/start',
+      }),
+    )
+
+    store.dispatch({ type: 'counter/increment', payload: 5 })
+    expect(store.getState().present.count).toStrictEqual(5)
+    expect(store.getState().history.past).toStrictEqual([])
+    expect(store.getState().history.future).toStrictEqual([])
+    expect(store.getState().history.tracking).toStrictEqual(false)
+    expect(store.getState().canUndo).toStrictEqual(false)
+    expect(store.getState().canRedo).toStrictEqual(false)
+
+    store.dispatch({ type: 'counter/start', payload: 10 })
+    expect(store.getState().present.count).toStrictEqual(10)
+    expect(store.getState().history.past).toStrictEqual([])
+    expect(store.getState().history.future).toStrictEqual([])
+    expect(store.getState().history.tracking).toStrictEqual(true)
+    expect(store.getState().canUndo).toStrictEqual(false)
+    expect(store.getState().canRedo).toStrictEqual(false)
+
+    store.dispatch({ type: 'counter/increment', payload: 5 })
+    expect(store.getState().present.count).toStrictEqual(15)
+    expect(store.getState().history.past).toStrictEqual([
+      { type: 'counter/increment', payload: 5 },
+    ])
+    expect(store.getState().history.future).toStrictEqual([])
+    expect(store.getState().canUndo).toStrictEqual(true)
+    expect(store.getState().canRedo).toStrictEqual(false)
+
+    store.dispatch({ type: 'counter/change-name', payload: 'New Counter Name' })
+    expect(store.getState().present.name).toStrictEqual('New Counter Name')
+    expect(store.getState().history.past).toStrictEqual([
+      { type: 'counter/increment', payload: 5 },
+      { type: 'counter/change-name', payload: 'New Counter Name' },
+    ])
+
+    store.dispatch({ type: ActionTypes.Undo })
+    expect(store.getState().present.count).toStrictEqual(10)
+    expect(store.getState().present.name).toStrictEqual('New Counter Name')
+    expect(store.getState().canUndo).toStrictEqual(false)
+    expect(store.getState().canRedo).toStrictEqual(true)
+  })
+
+  it('should lose state changes if an action is not tracked', () => {
+    const store = createStore(
+      undoableActions(baseReducer, {
+        trackedActionTypes: ['counter/increment', 'counter/decrement'],
+        undoableActionTypes: ['counter/increment', 'counter/decrement'],
+        trackAfterActionType: 'counter/start',
+      }),
+    )
+
+    store.dispatch({ type: 'counter/increment', payload: 5 })
+    expect(store.getState().present.count).toStrictEqual(5)
+    expect(store.getState().history.past).toStrictEqual([])
+    expect(store.getState().history.future).toStrictEqual([])
+    expect(store.getState().history.tracking).toStrictEqual(false)
+    expect(store.getState().canUndo).toStrictEqual(false)
+    expect(store.getState().canRedo).toStrictEqual(false)
+
+    store.dispatch({ type: 'counter/start', payload: 10 })
+    expect(store.getState().present.count).toStrictEqual(10)
+    expect(store.getState().history.past).toStrictEqual([])
+    expect(store.getState().history.future).toStrictEqual([])
+    expect(store.getState().history.tracking).toStrictEqual(true)
+    expect(store.getState().canUndo).toStrictEqual(false)
+    expect(store.getState().canRedo).toStrictEqual(false)
+
+    store.dispatch({ type: 'counter/increment', payload: 5 })
+    expect(store.getState().present.count).toStrictEqual(15)
+    expect(store.getState().history.past).toStrictEqual([
+      { type: 'counter/increment', payload: 5 },
+    ])
+    expect(store.getState().history.future).toStrictEqual([])
+    expect(store.getState().canUndo).toStrictEqual(true)
+    expect(store.getState().canRedo).toStrictEqual(false)
+
+    store.dispatch({ type: 'counter/change-name', payload: 'New Counter Name' })
+    expect(store.getState().present.name).toStrictEqual('New Counter Name')
+    expect(store.getState().history.past).toStrictEqual([
+      { type: 'counter/increment', payload: 5 },
+    ])
+
+    store.dispatch({ type: ActionTypes.Undo })
+    expect(store.getState().present.count).toStrictEqual(10)
+    // Since counter/change-name is not tracked, the change of 'New Counter Name' is ignored/lost
+    expect(store.getState().present.name).toStrictEqual('Counter')
+    expect(store.getState().canUndo).toStrictEqual(false)
+    expect(store.getState().canRedo).toStrictEqual(true)
   })
 })

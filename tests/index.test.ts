@@ -196,6 +196,33 @@ describe('undoableActions', () => {
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(true)
   })
+
+  it('should not track actions that do not change the state of the reducer', () => {
+    const store = createStore(undoableActions(baseReducer))
+
+    store.dispatch({ type: 'counter/increment', payload: 1 })
+    expect(store.getState().present.count).toStrictEqual(1)
+    expect(store.getState().history.past).toStrictEqual([
+      { type: 'counter/increment', payload: 1 },
+    ])
+
+    // Dispatching an action that does not change the state
+    store.dispatch({ type: 'unknown/action' })
+    expect(store.getState().present.count).toStrictEqual(1)
+    expect(store.getState().history.past).toStrictEqual([
+      { type: 'counter/increment', payload: 1 },
+    ])
+
+    // Dispatching another action that does not change the state
+    expect(store.getState().present.name).toStrictEqual('Counter')
+    store.dispatch({
+      type: 'counter/change-name',
+      payload: 'Counter',
+    })
+    expect(store.getState().history.past).toStrictEqual([
+      { type: 'counter/increment', payload: 1 },
+    ])
+  })
 })
 
 describe('undoableActions with custom config', () => {

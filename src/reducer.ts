@@ -30,6 +30,7 @@ export default function undoableActions<State, Action extends UnknownAction>(
     if (!state) {
       return initialState
     }
+
     switch (action.type) {
       case config.undoActionType:
         return undo(reducer, config, state)
@@ -44,7 +45,7 @@ export default function undoableActions<State, Action extends UnknownAction>(
         } = payload as Partial<
           Pick<History<State, Action>, 'past' | 'future' | 'tracking'>
         >
-        const newState = past.reduce(
+        const newPresent = past.reduce(
           (accState: State, a: Action): State => reducer(accState, a),
           state.present,
         )
@@ -56,21 +57,21 @@ export default function undoableActions<State, Action extends UnknownAction>(
             future,
             snapshot: state.present,
           },
-          present: newState,
+          present: newPresent,
           canUndo: canUndo(config, past),
           canRedo: future.length > 0,
         }
       }
       case config.trackAfterActionType: {
-        const newState = handle(reducer, config, state, action)
+        const newPresent = handle(reducer, config, state, action)
         return {
           ...initialState,
           history: {
             ...initialState.history,
             tracking: true,
-            snapshot: newState.present,
+            snapshot: newPresent.present,
           },
-          present: newState.present,
+          present: newPresent.present,
         }
       }
       default:
@@ -86,22 +87,27 @@ function undo<State, Action extends UnknownAction>(
 ): HistoryState<State, Action> {
   const { history } = state
   const { past, future } = history
+
   if (past.length === 0) {
     return state
   }
+
   const lastUndoableIndex =
     config.undoableActionTypes.length === 0
       ? past.length - 1
       : past.findLastIndex((a) => config.undoableActionTypes.includes(a.type))
+
   if (lastUndoableIndex === -1) {
     return state
   }
+
   const newPast = past.toSpliced(lastUndoableIndex, 1)
   const undoneAction = past[lastUndoableIndex]
   const replayedState = newPast.reduce(
     (accState, a) => reducer(accState, a),
     history.snapshot,
   )
+
   return {
     history: {
       ...history,
@@ -127,29 +133,33 @@ function redo<State, Action extends UnknownAction>(
 ): HistoryState<State, Action> {
   const { history, present } = state
   const { past, future } = history
+
   if (future.length === 0) {
     return state
   }
+
   const [redoAction, ...newFuture] = future
   let newPast
-  let newState
+  let newPresent
+
   if (redoAction.index === past.length) {
     newPast = [...past, redoAction.action]
-    newState = reducer(present, redoAction.action)
+    newPresent = reducer(present, redoAction.action)
   } else {
     newPast = past.toSpliced(redoAction.index, 0, redoAction.action)
-    newState = newPast.reduce(
+    newPresent = newPast.reduce(
       (accState, a) => reducer(accState, a),
       history.snapshot,
     )
   }
+
   return {
     history: {
       ...history,
       past: [...past, redoAction.action],
       future: newFuture,
     },
-    present: newState,
+    present: newPresent,
     canUndo: canUndo(config, newPast),
     canRedo: newFuture.length > 0,
   }
@@ -163,21 +173,25 @@ function handle<State, Action extends UnknownAction>(
 ): HistoryState<State, Action> {
   const { history, present } = state
   const { past, tracking } = history
-  if (!tracking) {
+
+  const newPresent = reducer(present, action)
+
+  if (!tracking || deepEqual(newPresent, present)) {
     return {
       ...state,
-      present: reducer(present, action),
+      present: newPresent,
     }
   }
-  const newState = reducer(present, action)
+
   const newPast = [...past, action]
+
   return {
     history: {
       ...history,
       past: newPast,
       future: [],
     },
-    present: newState,
+    present: newPresent,
     canUndo: canUndo(config, newPast),
     canRedo: false,
   }
@@ -195,4 +209,40 @@ function canUndo(
     config.undoableActionTypes.length === 0 ||
     past.some((a: UnknownAction) => config.undoableActionTypes.includes(a.type))
   )
+}
+
+function deepEqual<T>(a: T, b: T): boolean
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true
+  }
+
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) {
+      return false
+    }
+
+    const keysA = Reflect.ownKeys(a)
+    const keysB = Reflect.ownKeys(b)
+    if (keysA.length !== keysB.length) {
+      return false
+    }
+
+    for (const key of keysA) {
+      if (!keysB.includes(key)) {
+        return false
+      }
+      if (
+        !deepEqual(
+          (a as Record<PropertyKey, unknown>)[key],
+          (b as Record<PropertyKey, unknown>)[key],
+        )
+      ) {
+        return false
+      }
+    }
+    return true
+  }
+
+  return false
 }

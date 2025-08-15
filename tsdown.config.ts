@@ -5,5 +5,8 @@ export default defineConfig([
     entry: ['./src/index.ts'],
     platform: 'neutral',
     dts: true,
+    outputOptions: {
+      exports: 'named',
+    },
   },
 ])

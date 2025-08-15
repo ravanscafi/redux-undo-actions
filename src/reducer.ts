@@ -2,6 +2,7 @@ import type { Reducer, UnknownAction } from 'redux'
 
 import { ActionTypes } from './actions'
 import type { History, HistoryState, UndoableActionsConfig } from './types'
+import { deepEqual } from './utils'
 
 export default function undoableActions<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
@@ -37,42 +38,10 @@ export default function undoableActions<State, Action extends UnknownAction>(
       case config.redoActionType:
         return redo(reducer, config, state)
       case config.hydrateActionType: {
-        const { payload } = action
-        const {
-          past = [],
-          future = [],
-          tracking = true,
-        } = payload as Partial<
-          Pick<History<State, Action>, 'past' | 'future' | 'tracking'>
-        >
-        const newPresent = past.reduce(
-          (accState: State, a: Action): State => reducer(accState, a),
-          state.present,
-        )
-        return {
-          ...initialState,
-          history: {
-            tracking,
-            past,
-            future,
-            snapshot: state.present,
-          },
-          present: newPresent,
-          canUndo: canUndo(config, past),
-          canRedo: future.length > 0,
-        }
+        return hydrate(reducer, config, state, action, initialState)
       }
       case config.trackAfterActionType: {
-        const newPresent = handle(reducer, config, state, action)
-        return {
-          ...initialState,
-          history: {
-            ...initialState.history,
-            tracking: true,
-            snapshot: newPresent.present,
-          },
-          present: newPresent.present,
-        }
+        return trackAfter(reducer, config, state, action, initialState)
       }
       default:
         return handle(reducer, config, state, action)
@@ -165,6 +134,58 @@ function redo<State, Action extends UnknownAction>(
   }
 }
 
+function hydrate<State, Action extends UnknownAction>(
+  reducer: Reducer<State, Action>,
+  config: UndoableActionsConfig,
+  state: HistoryState<State, Action>,
+  action: Action,
+  initialState: HistoryState<State, Action>,
+): HistoryState<State, Action> {
+  const { payload } = action
+  const {
+    past = [],
+    future = [],
+    tracking = true,
+  } = payload as Partial<
+    Pick<History<State, Action>, 'past' | 'future' | 'tracking'>
+  >
+  const newPresent = past.reduce(
+    (accState: State, a: Action): State => reducer(accState, a),
+    state.present,
+  )
+  return {
+    ...initialState,
+    history: {
+      tracking,
+      past,
+      future,
+      snapshot: state.present,
+    },
+    present: newPresent,
+    canUndo: canUndo(config, past),
+    canRedo: future.length > 0,
+  }
+}
+
+function trackAfter<State, Action extends UnknownAction>(
+  reducer: Reducer<State, Action>,
+  config: UndoableActionsConfig,
+  state: HistoryState<State, Action>,
+  action: Action,
+  initialState: HistoryState<State, Action>,
+): HistoryState<State, Action> {
+  const newState = handle(reducer, config, state, action)
+  return {
+    ...initialState,
+    history: {
+      ...initialState.history,
+      tracking: true,
+      snapshot: newState.present,
+    },
+    present: newState.present,
+  }
+}
+
 function handle<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   config: UndoableActionsConfig,
@@ -209,40 +230,4 @@ function canUndo(
     config.undoableActionTypes.length === 0 ||
     past.some((a: UnknownAction) => config.undoableActionTypes.includes(a.type))
   )
-}
-
-function deepEqual<T>(a: T, b: T): boolean
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (a === b) {
-    return true
-  }
-
-  if (a && b && typeof a === 'object' && typeof b === 'object') {
-    if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) {
-      return false
-    }
-
-    const keysA = Reflect.ownKeys(a)
-    const keysB = Reflect.ownKeys(b)
-    if (keysA.length !== keysB.length) {
-      return false
-    }
-
-    for (const key of keysA) {
-      if (!keysB.includes(key)) {
-        return false
-      }
-      if (
-        !deepEqual(
-          (a as Record<PropertyKey, unknown>)[key],
-          (b as Record<PropertyKey, unknown>)[key],
-        )
-      ) {
-        return false
-      }
-    }
-    return true
-  }
-
-  return false
 }

@@ -5,8 +5,9 @@ import { legacy_createStore as createStore } from 'redux'
 import undoableActions, {
   ActionCreators,
   ActionTypes,
-  type HistoryAction,
+  exportHistory,
   HISTORY_KEY,
+  type HistoryAction,
   type HistoryState,
 } from '../src'
 
@@ -219,6 +220,32 @@ describe('undoableActions', () => {
     expectCount(store, 0)
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(true)
+  })
+
+  it('can export and later hydrate state with actions', () => {
+    let store = createStore(undoableActions(baseReducer))
+
+    store.dispatch({ type: 'counter/increment', payload: 10 })
+    store.dispatch({ type: 'counter/increment', payload: 20 })
+    store.dispatch({ type: 'counter/increment', payload: 30 })
+    expectCount(store, 60)
+    store.dispatch(ActionCreators.undo())
+    expectCount(store, 30)
+    expect(store.getState().canRedo).toStrictEqual(true)
+
+    const exportedHistory = exportHistory(store.getState())
+    expect(exportedHistory.actions.length).toBe(3)
+
+    // create a new store and hydrate it with the exported actions
+    store = createStore(undoableActions(baseReducer))
+
+    store.dispatch(ActionCreators.hydrate(exportedHistory))
+
+    expect(store.getState().canUndo).toStrictEqual(true)
+    expectCount(store, 30)
+    store.dispatch(ActionCreators.redo())
+    expectCount(store, 60)
+    expect(store.getState().canRedo).toStrictEqual(false)
   })
 
   it('should not track actions that do not change the state of the reducer', () => {

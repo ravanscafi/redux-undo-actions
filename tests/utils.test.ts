@@ -3,47 +3,11 @@ import {
   canRedo,
   canUndo,
   deepEqual,
+  exportHistory,
   isActionTracked,
   isActionUndoable,
 } from '../src/utils'
-
-describe('deepEqual', () => {
-  it('returns true for primitives that are equal', () => {
-    expect(deepEqual(1, 1)).toBe(true)
-    expect(deepEqual('a', 'a')).toBe(true)
-    expect(deepEqual(null, null)).toBe(true)
-  })
-
-  it('returns false for primitives that are not equal', () => {
-    expect(deepEqual(1, 2)).toBe(false)
-    expect(deepEqual('a', 'b')).toBe(false)
-    expect(deepEqual(null, undefined)).toBe(false)
-  })
-
-  it('returns true for deeply equal objects', () => {
-    expect(deepEqual({ a: 1, b: [2, 3] }, { a: 1, b: [2, 3] })).toBe(true)
-  })
-
-  it('returns false for objects with different keys or values', () => {
-    expect(deepEqual({ a: 1 }, { b: 1 })).toBe(false)
-    expect(deepEqual({ a: 1 }, { a: 2 })).toBe(false)
-  })
-
-  it('returns false for similar objects', () => {
-    expect(deepEqual({ a: 1, b: [2, 3] }, { a: 1, b: [2, 3, 4] })).toBe(false)
-  })
-
-  it('returns false for objects with different prototypes', () => {
-    class A {
-      x = 1
-    }
-    class B {
-      x = 1
-    }
-    expect(deepEqual(new A(), new B())).toBe(false)
-    expect(deepEqual(new A().x, new B().x)).toBe(true)
-  })
-})
+import { HISTORY_KEY } from '../src/types'
 
 describe('canUndo', () => {
   const config = {
@@ -119,5 +83,112 @@ describe('isActionTracked', () => {
     expect(
       isActionTracked({ trackedActionTypes: [] }, { type: 'file/open' }),
     ).toBe(true)
+  })
+})
+
+describe('exportHistory', () => {
+  it('exports a serializable snapshot of history state', () => {
+    const historyState = {
+      [HISTORY_KEY]: {
+        actions: [
+          { action: { type: 'file/add', payload: 1 }, skipped: false },
+          { action: { type: 'file/remove', payload: 2 }, skipped: true },
+        ],
+        tracking: true,
+        snapshot: { some: 'data' },
+      },
+      present: { some: 'state' },
+      canUndo: true,
+      canRedo: true,
+    }
+    const exported = exportHistory(historyState)
+    expect(exported).toEqual({
+      actions: [
+        { action: { type: 'file/add', payload: 1 }, skipped: false },
+        { action: { type: 'file/remove', payload: 2 }, skipped: true },
+      ],
+      tracking: true,
+    })
+    // Should be serializable
+    expect(() => JSON.stringify(exported)).not.toThrow()
+  })
+
+  it('handles empty actions and tracking', () => {
+    const historyState = {
+      [HISTORY_KEY]: {
+        actions: [],
+        tracking: false,
+        snapshot: { some: 'data' },
+      },
+      present: { some: 'state' },
+      canUndo: false,
+      canRedo: false,
+    }
+    const exported = exportHistory(historyState)
+    expect(exported).toEqual({ actions: [], tracking: false })
+  })
+
+  it('falls back to JSON.parse if structuredClone is unavailable', () => {
+    const originalStructuredClone = globalThis.structuredClone
+    delete (globalThis as Partial<typeof globalThis>).structuredClone
+
+    const historyState = {
+      [HISTORY_KEY]: {
+        actions: [
+          { action: { type: 'file/add', payload: 123 }, skipped: false },
+        ],
+        tracking: true,
+        snapshot: { some: 'data' },
+      },
+      present: { some: 'state' },
+      canUndo: true,
+      canRedo: false,
+    }
+    const exported = exportHistory(historyState)
+    expect(exported).toEqual({
+      actions: [{ action: { type: 'file/add', payload: 123 }, skipped: false }],
+      tracking: true,
+    })
+    expect(() => JSON.stringify(exported)).not.toThrow()
+
+    globalThis.structuredClone = originalStructuredClone
+  })
+})
+
+describe('deepEqual', () => {
+  it('returns true for primitives that are equal', () => {
+    expect(deepEqual(1, 1)).toBe(true)
+    expect(deepEqual('a', 'a')).toBe(true)
+    expect(deepEqual(null, null)).toBe(true)
+  })
+
+  it('returns false for primitives that are not equal', () => {
+    expect(deepEqual(1, 2)).toBe(false)
+    expect(deepEqual('a', 'b')).toBe(false)
+    expect(deepEqual(null, undefined)).toBe(false)
+  })
+
+  it('returns true for deeply equal objects', () => {
+    expect(deepEqual({ a: 1, b: [2, 3] }, { a: 1, b: [2, 3] })).toBe(true)
+  })
+
+  it('returns false for objects with different keys or values', () => {
+    expect(deepEqual({ a: 1 }, { b: 1 })).toBe(false)
+    expect(deepEqual({ a: 1 }, { a: 2 })).toBe(false)
+  })
+
+  it('returns false for similar objects', () => {
+    expect(deepEqual({ a: 1, b: [2, 3] }, { a: 1, b: [2, 3, 4] })).toBe(false)
+  })
+
+  it('returns false for objects with different prototypes', () => {
+    class A {
+      x = 1
+    }
+    class B {
+      x = 1
+    }
+    expect(deepEqual(new A(), new B())).toBe(false)
+    expect(deepEqual(new A().x, new B().x)).toBe(true)
   })
 })

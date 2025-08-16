@@ -1,8 +1,8 @@
 import type { Reducer, UnknownAction } from 'redux'
 import {
-  type History,
-  type HistoryAction,
+  type ExportedHistory,
   HISTORY_KEY,
+  type HistoryAction,
   type HistoryState,
   type UndoableActionsConfig,
 } from './types'
@@ -131,8 +131,9 @@ function hydrate<State, Action extends UnknownAction>(
   initialState: HistoryState<State, Action>,
 ): HistoryState<State, Action> {
   const { payload } = action
-  const { actions = [], tracking = true } = payload as Partial<
-    Pick<History<State, Action>, 'actions' | 'tracking'>
+  const { actions = [], tracking = true } = payload as ExportedHistory<
+    State,
+    Action
   >
 
   const newPresent = replay(reducer, actions, state.present)

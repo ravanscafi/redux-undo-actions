@@ -1,5 +1,6 @@
 import type { UnknownAction } from 'redux'
 import {
+  type ExportedHistory,
   type History,
   HISTORY_KEY,
   type HistoryAction,
@@ -63,7 +64,7 @@ export function isActionTracked(
  */
 export function exportHistory<State, Action extends UnknownAction>(
   historyState: HistoryState<State, Action>,
-): Pick<History<State, Action>, 'actions' | 'tracking'> {
+): ExportedHistory<State, Action> {
   const state = {
     actions: historyState[HISTORY_KEY].actions,
     tracking: historyState[HISTORY_KEY].tracking,

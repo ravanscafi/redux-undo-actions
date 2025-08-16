@@ -1,5 +1,5 @@
 import type { UnknownAction } from 'redux'
-import type { History } from './types'
+import type { ExportedHistory } from './types'
 
 export const ActionTypes = {
   Undo: '@@redux-undo-actions/undo',
@@ -11,7 +11,7 @@ export const ActionCreators = {
   undo: (): UnknownAction => ({ type: ActionTypes.Undo }),
   redo: (): UnknownAction => ({ type: ActionTypes.Redo }),
   hydrate: <State, Action extends UnknownAction>(
-    payload: Partial<Pick<History<State, Action>, 'actions' | 'tracking'>>,
+    payload: ExportedHistory<State, Action>,
   ): UnknownAction => ({
     type: ActionTypes.Hydrate,
     payload,

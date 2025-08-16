@@ -194,7 +194,7 @@ describe('undoableActions', () => {
       { action: { type: 'counter/increment', payload: 10 }, skipped: true },
     ]
 
-    store.dispatch(ActionCreators.hydrate({ actions }))
+    store.dispatch(ActionCreators.hydrate({ actions, tracking: true }))
 
     expectCount(store, 2)
     expect(store.getState()[HISTORY_KEY].tracking).toStrictEqual(true)

@@ -20,6 +20,11 @@ export interface HistoryState<State, Action extends UnknownAction> {
   [HISTORY_KEY]: History<State, Action>
 }
 
+export type ExportedHistory<State, Action extends UnknownAction> = Pick<
+  History<State, Action>,
+  'actions' | 'tracking'
+>
+
 export interface UndoableActionsConfig {
   trackedActionTypes: UnknownAction['type'][]
   undoableActionTypes: UnknownAction['type'][]

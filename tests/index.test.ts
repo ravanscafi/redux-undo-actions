@@ -6,6 +6,7 @@ import undoableActions, {
   ActionCreators,
   ActionTypes,
   type HistoryAction,
+  HISTORY_KEY,
   type HistoryState,
 } from '../src'
 
@@ -40,11 +41,18 @@ function expectCount(
   expect(store.getState().present.count).toStrictEqual(expectedCount)
 }
 
+function expectHistoryActions(
+  store: Store<HistoryState<{ name: string; count: number }, UnknownAction>>,
+  expectedActions: HistoryAction<UnknownAction>[],
+) {
+  expect(store.getState()[HISTORY_KEY].actions).toStrictEqual(expectedActions)
+}
+
 describe('undoableActions', () => {
   it('should initialize with default state', () => {
     const store = createStore(undoableActions(baseReducer))
     expectCount(store, 0)
-    expect(store.getState().history.actions).toStrictEqual([])
+    expectHistoryActions(store, [])
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(false)
   })
@@ -53,7 +61,7 @@ describe('undoableActions', () => {
     const store = createStore(undoableActions(baseReducer))
     store.dispatch(ActionCreators.undo())
     expectCount(store, 0)
-    expect(store.getState().history.actions).toStrictEqual([])
+    expectHistoryActions(store, [])
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(false)
   })
@@ -151,10 +159,7 @@ describe('undoableActions', () => {
     const store = createStore(undoableActions(baseReducer))
     const action = { type: 'counter/increment', payload: 10 }
     store.dispatch(action)
-    expect(store.getState().history.actions[0]).toStrictEqual({
-      action,
-      skipped: false,
-    })
+    expectHistoryActions(store, [{ action, skipped: false }])
     expectCount(store, 10)
     expect(store.getState().canUndo).toStrictEqual(true)
     expect(store.getState().canRedo).toStrictEqual(false)
@@ -191,7 +196,7 @@ describe('undoableActions', () => {
     store.dispatch(ActionCreators.hydrate({ actions }))
 
     expectCount(store, 2)
-    expect(store.getState().history.tracking).toStrictEqual(true)
+    expect(store.getState()[HISTORY_KEY].tracking).toStrictEqual(true)
     expect(store.getState().canUndo).toStrictEqual(true)
     expect(store.getState().canRedo).toStrictEqual(true)
 
@@ -221,14 +226,14 @@ describe('undoableActions', () => {
 
     store.dispatch({ type: 'counter/increment', payload: 1 })
     expectCount(store, 1)
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment', payload: 1 }, skipped: false },
     ])
 
     // Dispatching an action that does not change the state
     store.dispatch({ type: 'unknown/action' })
     expectCount(store, 1)
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment', payload: 1 }, skipped: false },
     ])
 
@@ -238,7 +243,7 @@ describe('undoableActions', () => {
       type: 'counter/change-name',
       payload: 'Counter',
     })
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment', payload: 1 }, skipped: false },
     ])
   })
@@ -257,27 +262,27 @@ describe('undoableActions with custom config', () => {
     )
 
     expectCount(store, 0)
-    expect(store.getState().history.actions).toStrictEqual([])
+    expectHistoryActions(store, [])
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(false)
 
     store.dispatch({ type: 'counter/increment', payload: 5 })
     expectCount(store, 5)
-    expect(store.getState().history.actions).toStrictEqual([])
-    expect(store.getState().history.tracking).toStrictEqual(false)
+    expectHistoryActions(store, [])
+    expect(store.getState()[HISTORY_KEY].tracking).toStrictEqual(false)
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(false)
 
     store.dispatch({ type: 'counter/start', payload: 10 })
     expectCount(store, 10)
-    expect(store.getState().history.actions).toStrictEqual([])
-    expect(store.getState().history.tracking).toStrictEqual(true)
+    expectHistoryActions(store, [])
+    expect(store.getState()[HISTORY_KEY].tracking).toStrictEqual(true)
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(false)
 
     store.dispatch({ type: 'counter/increment', payload: 5 })
     expectCount(store, 15)
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment', payload: 5 }, skipped: false },
     ])
     expect(store.getState().canUndo).toStrictEqual(true)
@@ -319,21 +324,21 @@ describe('undoableActions with custom config', () => {
 
     store.dispatch({ type: 'counter/increment', payload: 5 })
     expectCount(store, 5)
-    expect(store.getState().history.actions).toStrictEqual([])
-    expect(store.getState().history.tracking).toStrictEqual(false)
+    expectHistoryActions(store, [])
+    expect(store.getState()[HISTORY_KEY].tracking).toStrictEqual(false)
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(false)
 
     store.dispatch({ type: 'counter/start', payload: 10 })
     expectCount(store, 10)
-    expect(store.getState().history.actions).toStrictEqual([])
-    expect(store.getState().history.tracking).toStrictEqual(true)
+    expectHistoryActions(store, [])
+    expect(store.getState()[HISTORY_KEY].tracking).toStrictEqual(true)
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(false)
 
     store.dispatch({ type: 'counter/increment', payload: 5 })
     expectCount(store, 15)
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment', payload: 5 }, skipped: false },
     ])
     expect(store.getState().canUndo).toStrictEqual(true)
@@ -341,7 +346,7 @@ describe('undoableActions with custom config', () => {
 
     store.dispatch({ type: 'counter/change-name', payload: 'New Counter Name' })
     expect(store.getState().present.name).toStrictEqual('New Counter Name')
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment', payload: 5 }, skipped: false },
       {
         action: { type: 'counter/change-name', payload: 'New Counter Name' },
@@ -367,21 +372,21 @@ describe('undoableActions with custom config', () => {
 
     store.dispatch({ type: 'counter/increment', payload: 5 })
     expectCount(store, 5)
-    expect(store.getState().history.actions).toStrictEqual([])
-    expect(store.getState().history.tracking).toStrictEqual(false)
+    expectHistoryActions(store, [])
+    expect(store.getState()[HISTORY_KEY].tracking).toStrictEqual(false)
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(false)
 
     store.dispatch({ type: 'counter/start', payload: 10 })
     expectCount(store, 10)
-    expect(store.getState().history.actions).toStrictEqual([])
-    expect(store.getState().history.tracking).toStrictEqual(true)
+    expectHistoryActions(store, [])
+    expect(store.getState()[HISTORY_KEY].tracking).toStrictEqual(true)
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(false)
 
     store.dispatch({ type: 'counter/increment', payload: 5 })
     expectCount(store, 15)
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment', payload: 5 }, skipped: false },
     ])
     expect(store.getState().canUndo).toStrictEqual(true)
@@ -389,7 +394,7 @@ describe('undoableActions with custom config', () => {
 
     store.dispatch({ type: 'counter/change-name', payload: 'New Counter Name' })
     expect(store.getState().present.name).toStrictEqual('New Counter Name')
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment', payload: 5 }, skipped: false },
     ])
 
@@ -412,7 +417,7 @@ describe('undoableActions with custom config', () => {
     store.dispatch({ type: 'counter/increment' })
     store.dispatch({ type: 'counter/increment', payload: 2 })
     expectCount(store, 3)
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment' }, skipped: false },
       { action: { type: 'counter/increment', payload: 2 }, skipped: false },
     ])
@@ -421,14 +426,14 @@ describe('undoableActions with custom config', () => {
     expectCount(store, 1)
     expect(store.getState().canUndo).toStrictEqual(true)
     expect(store.getState().canRedo).toStrictEqual(true)
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment' }, skipped: false },
       { action: { type: 'counter/increment', payload: 2 }, skipped: true },
     ])
 
     store.dispatch({ type: 'counter/change-name', payload: 'The new name' })
     expect(store.getState().present.name).toStrictEqual('The new name')
-    expect(store.getState().history.actions).toStrictEqual([
+    expectHistoryActions(store, [
       { action: { type: 'counter/increment' }, skipped: false },
       { action: { type: 'counter/increment', payload: 2 }, skipped: true },
       {

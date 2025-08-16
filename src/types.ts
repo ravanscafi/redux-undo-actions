@@ -11,11 +11,13 @@ export interface History<State, Action extends UnknownAction> {
   snapshot: State
 }
 
+export const HISTORY_KEY = '__redux_undo_actions_history'
+
 export interface HistoryState<State, Action extends UnknownAction> {
   present: State
-  history: History<State, Action>
   canUndo: boolean
   canRedo: boolean
+  [HISTORY_KEY]: History<State, Action>
 }
 
 export interface UndoableActionsConfig {

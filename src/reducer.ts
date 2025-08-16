@@ -7,7 +7,14 @@ export default function undoableActions<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   customConfig?: Partial<UndoableActionsConfig>,
 ): Reducer<HistoryState<State, Action>, Action> {
-  const config = getConfig(customConfig)
+  const config = {
+    undoActionType: ActionTypes.Undo,
+    redoActionType: ActionTypes.Redo,
+    hydrateActionType: ActionTypes.Hydrate,
+    undoableActionTypes: [],
+    trackedActionTypes: [],
+    ...customConfig,
+  }
 
   const { initialState, undo, redo, hydrate, handle, trackAfter } =
     createHandler(reducer, config)
@@ -29,18 +36,5 @@ export default function undoableActions<State, Action extends UnknownAction>(
       default:
         return handle(state, action)
     }
-  }
-}
-
-export function getConfig(
-  customConfig?: Partial<UndoableActionsConfig>,
-): UndoableActionsConfig {
-  return {
-    undoActionType: ActionTypes.Undo,
-    redoActionType: ActionTypes.Redo,
-    hydrateActionType: ActionTypes.Hydrate,
-    undoableActionTypes: [],
-    trackedActionTypes: [],
-    ...customConfig,
   }
 }

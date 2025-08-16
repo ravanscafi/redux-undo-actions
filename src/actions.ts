@@ -11,9 +11,7 @@ export const ActionCreators = {
   undo: (): UnknownAction => ({ type: ActionTypes.Undo }),
   redo: (): UnknownAction => ({ type: ActionTypes.Redo }),
   hydrate: <State, Action extends UnknownAction>(
-    payload: Partial<
-      Pick<History<State, Action>, 'past' | 'future' | 'tracking'>
-    >,
+    payload: Partial<Pick<History<State, Action>, 'actions' | 'tracking'>>,
   ): UnknownAction => ({
     type: ActionTypes.Hydrate,
     payload,

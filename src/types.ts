@@ -1,12 +1,13 @@
 import type { UnknownAction } from 'redux'
 
+export interface HistoryAction<Action extends UnknownAction> {
+  action: Action
+  skipped: boolean
+}
+
 export interface History<State, Action extends UnknownAction> {
   tracking: boolean
-  past: Action[]
-  future: {
-    action: Action
-    index: number
-  }[]
+  actions: HistoryAction<Action>[]
   snapshot: State
 }
 

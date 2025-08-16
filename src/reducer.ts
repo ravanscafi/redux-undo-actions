@@ -22,12 +22,10 @@ export default function undoableActions<State, Action extends UnknownAction>(
         return undo(state)
       case config.redoActionType:
         return redo(state)
-      case config.hydrateActionType: {
+      case config.hydrateActionType:
         return hydrate(state, action)
-      }
-      case config.trackAfterActionType: {
+      case config.trackAfterActionType:
         return trackAfter(state, action)
-      }
       default:
         return handle(state, action)
     }

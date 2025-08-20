@@ -1,4 +1,5 @@
 import type { UnknownAction } from 'redux'
+import { ActionTypes } from './actions'
 
 export interface HistoryAction<Action extends UnknownAction> {
   action: Action
@@ -25,11 +26,37 @@ export type ExportedHistory<State, Action extends UnknownAction> = Pick<
   'actions' | 'tracking'
 >
 
+export interface Persistence {
+  reducerKey: string
+  getStorageKey: (getState: () => unknown) => string
+  storage: StoragePersistor
+  dispatchAfterMaybeLoading?: UnknownAction['type']
+}
+
+export interface StoragePersistor {
+  getItem(key: string): Promise<string | null>
+  setItem(key: string, value: string): Promise<void>
+  removeItem(key: string): Promise<void>
+}
+
 export interface UndoableActionsConfig {
   trackedActionTypes: UnknownAction['type'][]
   undoableActionTypes: UnknownAction['type'][]
   undoActionType: UnknownAction['type']
   redoActionType: UnknownAction['type']
   hydrateActionType: UnknownAction['type']
-  trackAfterActionType?: UnknownAction['type']
+  trackAfterActionType: UnknownAction['type'] | undefined
+}
+
+export const initialUndoableActionsConfig: UndoableActionsConfig = {
+  undoActionType: ActionTypes.Undo,
+  redoActionType: ActionTypes.Redo,
+  hydrateActionType: ActionTypes.Hydrate,
+  undoableActionTypes: [],
+  trackedActionTypes: [],
+  trackAfterActionType: undefined,
+}
+
+export type PersistedUndoableActionsConfig = UndoableActionsConfig & {
+  persistence: Persistence
 }

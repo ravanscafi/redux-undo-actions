@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { Store, UnknownAction } from 'redux'
 import { legacy_createStore as createStore } from 'redux'
 
-import undoableActions, {
+import {
   ActionCreators,
   ActionTypes,
   exportHistory,
   HISTORY_KEY,
   type HistoryAction,
   type HistoryState,
+  undoableActions,
 } from '../src'
 
 const baseReducer = (

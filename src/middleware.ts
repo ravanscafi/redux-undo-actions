@@ -14,14 +14,23 @@ export const createPersistenceMiddleware = (
   const { reducerKey, getStorageKey, storage, dispatchAfterMaybeLoading } =
     config.persistence
   const isTracked = (action: UnknownAction) => isActionTracked(config, action)
-  let isSaving = false
-  let isLoading = false
+  let canUseStorage = true
 
   return (storeAPI) => (next) => async (action) => {
     if (!isAction(action)) {
       throw new Error(
         'Invalid action provided! Use custom middleware for async actions.',
       )
+    }
+
+    if (canUseStorage && action.type === config.resetActionType) {
+      canUseStorage = false
+      await removeHistory(
+        storage,
+        getStorageKey(() => storeAPI.getState()),
+      )
+      canUseStorage = true
+      return next(action)
     }
 
     if (!isTracked(action)) {
@@ -42,8 +51,8 @@ export const createPersistenceMiddleware = (
       HistoryState<unknown, UnknownAction>
     >
 
-    if (action.type === config.trackAfterActionType && !isLoading) {
-      isLoading = true
+    if (action.type === config.trackAfterActionType && canUseStorage) {
+      canUseStorage = false
       const history = await loadHistory(
         storage,
         getStorageKey(() => storeAPI.getState()),
@@ -53,8 +62,6 @@ export const createPersistenceMiddleware = (
         storeAPI.dispatch({ type: config.hydrateActionType, payload: history })
       }
 
-      isLoading = false
-
       if (dispatchAfterMaybeLoading) {
         // experimental timeout to allow visual changes to be applied after hydration
         setTimeout(
@@ -62,6 +69,8 @@ export const createPersistenceMiddleware = (
           100,
         )
       }
+
+      canUseStorage = true
 
       // halt from saving for no reason
       return returnValue
@@ -81,18 +90,17 @@ export const createPersistenceMiddleware = (
     const currentHistory = currentState[reducerKey][HISTORY_KEY]
 
     if (
-      !isSaving &&
-      !isLoading &&
+      canUseStorage &&
       (currentHistory.tracking !== previousHistory.tracking ||
         (currentHistory.actions.length > 0 &&
           currentHistory.actions !== previousHistory.actions))
     ) {
-      isSaving = true
+      canUseStorage = false
       const history = exportHistory(currentState[reducerKey])
 
       const storageKey = getStorageKey(() => storeAPI.getState())
       await saveHistory(storage, storageKey, history)
-      isSaving = false
+      canUseStorage = true
     }
 
     return returnValue
@@ -108,6 +116,14 @@ const saveHistory = async <State, Action extends UnknownAction>(
     await storage.setItem(storageKey, JSON.stringify(history))
   } catch (e) {
     console.warn('failed to save history to storage', e)
+  }
+}
+
+const removeHistory = async (storage: StoragePersistor, storageKey: string) => {
+  try {
+    await storage.removeItem(storageKey)
+  } catch (e) {
+    console.warn('failed to remove history from storage', e)
   }
 }
 

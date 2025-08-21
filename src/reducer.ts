@@ -18,7 +18,7 @@ export function undoableActions<State, Action extends UnknownAction>(
     ...customConfig,
   }
 
-  const { initialState, undo, redo, hydrate, handle, trackAfter } =
+  const { initialState, undo, redo, reset, hydrate, handle, trackAfter } =
     createHandler(reducer, config)
 
   return function (state, action) {
@@ -31,6 +31,8 @@ export function undoableActions<State, Action extends UnknownAction>(
         return undo(state)
       case config.redoActionType:
         return redo(state)
+      case config.resetActionType:
+        return reset()
       case config.hydrateActionType:
         return hydrate(state, action)
       case config.trackAfterActionType:

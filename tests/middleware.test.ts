@@ -16,8 +16,8 @@ interface CounterState {
 }
 const initialState: CounterState = { count: 0 }
 
-describe('persistedUndoableActions', () => {
-  it('should ignore untracked actions', async () => {
+describe.concurrent('persistedUndoableActions', () => {
+  it.concurrent('should ignore untracked actions', async () => {
     const { store, mockStorage } = getStore()
     store.dispatch({ type: 'untracked' })
     expect(store.getState().counter.present).toEqual(initialState)
@@ -28,13 +28,13 @@ describe('persistedUndoableActions', () => {
     })
 
     // wait for "possible" save
-    await sleep(100)
+    await sleep(50)
 
     expect(mockStorage.getItem).not.toHaveBeenCalled()
     expect(mockStorage.setItem).not.toHaveBeenCalled()
   })
 
-  it('should load state when tracking starts', async () => {
+  it.concurrent('should load state when tracking starts', async () => {
     const { store, mockStorage } = getStore()
     mockStorage.getItem = vi.fn().mockResolvedValue(
       JSON.stringify({
@@ -55,7 +55,7 @@ describe('persistedUndoableActions', () => {
     })
   })
 
-  it('should save history when actions happen', async () => {
+  it.concurrent('should save history when actions happen', async () => {
     const { store, mockStorage } = getStore()
     expect(store.getState().counter.present).toEqual({ count: 0 })
 
@@ -63,7 +63,7 @@ describe('persistedUndoableActions', () => {
     store.dispatch({ type: 'counter/start' })
 
     // wait for load
-    await sleep(100) // not sure why vi.wait doesn't work for the last expectation unless we sleep here
+    await sleep(50) // not sure why vi.wait doesn't work for the last expectation unless we sleep here
     expect(mockStorage.getItem).toHaveBeenCalledExactlyOnceWith('key')
 
     // start actions
@@ -78,7 +78,32 @@ describe('persistedUndoableActions', () => {
     expect(mockStorage.setItem).toHaveBeenCalledOnce()
   })
 
-  it('should handle saving storage errors gracefully', async () => {
+  it.concurrent('should reset state when clean action happens', async () => {
+    const { store, mockStorage } = getStore({
+      resetActionType: 'counter/reset',
+    })
+
+    // prepare some state
+    store.dispatch({ type: 'counter/start' })
+    store.dispatch({ type: 'counter/increment' })
+    store.dispatch({ type: 'counter/increment' })
+    await sleep(50)
+
+    // reset state
+    store.dispatch({ type: 'counter/reset' })
+
+    await vi.waitFor(() => {
+      expect(mockStorage.removeItem).toHaveBeenCalledExactlyOnceWith('key')
+      expect(store.getState().counter.present).toEqual(initialState)
+      expect(store.getState().counter[HISTORY_KEY]).toEqual({
+        tracking: false,
+        actions: [],
+        snapshot: initialState,
+      })
+    })
+  })
+
+  it.concurrent('should handle saving storage errors gracefully', async () => {
     const { store, mockStorage } = getStore()
     const error = new Error('failed!')
     mockStorage.setItem = vi.fn().mockRejectedValue(error)
@@ -87,7 +112,7 @@ describe('persistedUndoableActions', () => {
     store.dispatch({ type: 'counter/start' })
 
     // wait for load
-    await sleep(100)
+    await sleep(50)
     expect(mockStorage.getItem).toHaveBeenCalledExactlyOnceWith('key')
     // start actions
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => void 0)
@@ -97,7 +122,7 @@ describe('persistedUndoableActions', () => {
     expect(store.getState().counter[HISTORY_KEY]).toEqual({
       tracking: true,
       actions: [{ action: { type: 'counter/increment' }, skipped: false }],
-      snapshot: { count: 0 },
+      snapshot: initialState,
     })
 
     await vi.waitFor(() => {
@@ -109,7 +134,7 @@ describe('persistedUndoableActions', () => {
     spy.mockRestore()
   })
 
-  it('should handle loading storage errors gracefully', async () => {
+  it.concurrent('should handle loading storage errors gracefully', async () => {
     const { store, mockStorage } = getStore()
     const error = new Error('failed!')
     mockStorage.getItem = vi.fn().mockRejectedValue(error)
@@ -128,7 +153,30 @@ describe('persistedUndoableActions', () => {
     spy.mockRestore()
   })
 
-  it('should reject dispatched non-actions', async () => {
+  it.concurrent(
+    'should handle errors when removing from the storage gracefully',
+    async () => {
+      const { store, mockStorage } = getStore()
+      const error = new Error('failed!')
+      mockStorage.removeItem = vi.fn().mockRejectedValue(error)
+
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => void 0)
+
+      // trigger removing
+      store.dispatch({ type: 'counter/reset' })
+
+      await vi.waitFor(() => {
+        expect(mockStorage.removeItem).toHaveBeenCalledExactlyOnceWith('key')
+        expect(spy).toHaveBeenCalledExactlyOnceWith(
+          'failed to remove history from storage',
+          error,
+        )
+      })
+      spy.mockRestore()
+    },
+  )
+
+  it.concurrent('should reject dispatched non-actions', async () => {
     const { store } = getStore()
     // @ts-expect-error purposely invalid
     await expect(() => store.dispatch(() => undefined)).rejects.toThrow(
@@ -136,7 +184,7 @@ describe('persistedUndoableActions', () => {
     )
   })
 
-  it('should identify wrongly configured reducer key', async () => {
+  it.concurrent('should identify wrongly configured reducer key', async () => {
     const { store } = getStore({
       trackAfterActionType: undefined,
       persistence: { reducerKey: 'wrongKey' },
@@ -148,7 +196,7 @@ describe('persistedUndoableActions', () => {
     )
   })
 
-  it('should ignore untracked actions', () => {
+  it.concurrent('should ignore untracked actions', () => {
     const { store } = getStore({
       trackAfterActionType: undefined,
       trackedActionTypes: ['counter/increment'],
@@ -164,7 +212,7 @@ describe('persistedUndoableActions', () => {
 
     store.dispatch({ type: 'counter/increment' })
 
-    expect(store.getState().counter.present).toEqual({ count: 0 })
+    expect(store.getState().counter.present).toEqual(initialState)
     expect(store.getState().counter[HISTORY_KEY]).toEqual({
       tracking: true,
       actions: [{ action: { type: 'counter/increment' }, skipped: false }],
@@ -172,27 +220,32 @@ describe('persistedUndoableActions', () => {
     })
   })
 
-  it('should dispatch custom dispatchAfterMaybeLoading after hydration', async () => {
-    const { store, mockStorage } = getStore({
-      persistence: {
-        dispatchAfterMaybeLoading: 'counter/loaded',
-      },
-    })
-    const spy = vi.fn()
-    store.subscribe(() => {
-      if (store.getState().counter.present.count === 0) {
-        spy()
-      }
-    })
-    mockStorage.getItem = vi
-      .fn()
-      .mockResolvedValue(
-        JSON.stringify({ tracking: true, actions: [], snapshot: { count: 0 } }),
+  it.concurrent(
+    'should dispatch custom dispatchAfterMaybeLoading after hydration',
+    async () => {
+      const { store, mockStorage } = getStore({
+        persistence: {
+          dispatchAfterMaybeLoading: 'counter/loaded',
+        },
+      })
+      const spy = vi.fn()
+      store.subscribe(() => {
+        if (store.getState().counter.present.count === 0) {
+          spy()
+        }
+      })
+      mockStorage.getItem = vi.fn().mockResolvedValue(
+        JSON.stringify({
+          tracking: true,
+          actions: [],
+          snapshot: initialState,
+        }),
       )
-    store.dispatch({ type: 'counter/start' })
-    await sleep(100)
-    expect(spy).toHaveBeenCalled()
-  })
+      store.dispatch({ type: 'counter/start' })
+      await sleep(50)
+      expect(spy).toHaveBeenCalled()
+    },
+  )
 })
 
 function getStore(
@@ -210,7 +263,7 @@ function getStore(
       case 'counter/decrement':
         return { count: state.count - 1 }
       case 'counter/reset':
-        return { count: 0 }
+        return initialState
       default:
         return state
     }
@@ -224,6 +277,7 @@ function getStore(
   const persistedReducer = persistedUndoableActions(counterReducer, {
     trackAfterActionType: 'counter/start',
     hydrateActionType: 'counter/hydrate',
+    resetActionType: 'counter/reset',
     ...config,
     persistence: {
       reducerKey: 'counter',

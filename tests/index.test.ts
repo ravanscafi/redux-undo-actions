@@ -50,8 +50,8 @@ function expectHistoryActions(
   expect(store.getState()[HISTORY_KEY].actions).toStrictEqual(expectedActions)
 }
 
-describe('undoableActions', () => {
-  it('should initialize with default state', () => {
+describe.concurrent('undoableActions', () => {
+  it.concurrent('should initialize with default state', () => {
     const store = createStore(undoableActions(baseReducer))
     expectCount(store, 0)
     expectHistoryActions(store, [])
@@ -59,7 +59,7 @@ describe('undoableActions', () => {
     expect(store.getState().canRedo).toStrictEqual(false)
   })
 
-  it('should not undo if action history is empty', () => {
+  it.concurrent('should not undo if action history is empty', () => {
     const store = createStore(undoableActions(baseReducer))
     store.dispatch(ActionCreators.undo())
     expectCount(store, 0)
@@ -68,7 +68,7 @@ describe('undoableActions', () => {
     expect(store.getState().canRedo).toStrictEqual(false)
   })
 
-  it('should not redo if there are no future actions', () => {
+  it.concurrent('should not redo if there are no future actions', () => {
     const store = createStore(undoableActions(baseReducer))
     store.dispatch(ActionCreators.redo())
     expectCount(store, 0)
@@ -81,7 +81,7 @@ describe('undoableActions', () => {
     expect(store.getState().canRedo).toStrictEqual(false)
   })
 
-  it('should handle multiple undos and redos', () => {
+  it.concurrent('should handle multiple undos and redos', () => {
     const store = createStore(undoableActions(baseReducer))
     store.dispatch({ type: 'counter/increment', payload: 1 })
     store.dispatch({ type: 'counter/increment', payload: 2 })
@@ -134,30 +134,33 @@ describe('undoableActions', () => {
     expect(store.getState().canRedo).toStrictEqual(false)
   })
 
-  it('should apply actions with payloads and support undo/redo', () => {
-    const store = createStore(undoableActions(baseReducer))
-    store.dispatch({ type: 'counter/increment', payload: 2 })
-    expectCount(store, 2)
-    expect(store.getState().canUndo).toStrictEqual(true)
-    expect(store.getState().canRedo).toStrictEqual(false)
+  it.concurrent(
+    'should apply actions with payloads and support undo/redo',
+    () => {
+      const store = createStore(undoableActions(baseReducer))
+      store.dispatch({ type: 'counter/increment', payload: 2 })
+      expectCount(store, 2)
+      expect(store.getState().canUndo).toStrictEqual(true)
+      expect(store.getState().canRedo).toStrictEqual(false)
 
-    store.dispatch({ type: 'counter/increment', payload: 3 })
-    expectCount(store, 5)
-    expect(store.getState().canUndo).toStrictEqual(true)
-    expect(store.getState().canRedo).toStrictEqual(false)
+      store.dispatch({ type: 'counter/increment', payload: 3 })
+      expectCount(store, 5)
+      expect(store.getState().canUndo).toStrictEqual(true)
+      expect(store.getState().canRedo).toStrictEqual(false)
 
-    store.dispatch(ActionCreators.undo())
-    expectCount(store, 2)
-    expect(store.getState().canUndo).toStrictEqual(true)
-    expect(store.getState().canRedo).toStrictEqual(true)
+      store.dispatch(ActionCreators.undo())
+      expectCount(store, 2)
+      expect(store.getState().canUndo).toStrictEqual(true)
+      expect(store.getState().canRedo).toStrictEqual(true)
 
-    store.dispatch(ActionCreators.redo())
-    expectCount(store, 5)
-    expect(store.getState().canUndo).toStrictEqual(true)
-    expect(store.getState().canRedo).toStrictEqual(false)
-  })
+      store.dispatch(ActionCreators.redo())
+      expectCount(store, 5)
+      expect(store.getState().canUndo).toStrictEqual(true)
+      expect(store.getState().canRedo).toStrictEqual(false)
+    },
+  )
 
-  it('should store full actions including payload', () => {
+  it.concurrent('should store full actions including payload', () => {
     const store = createStore(undoableActions(baseReducer))
     const action = { type: 'counter/increment', payload: 10 }
     store.dispatch(action)
@@ -167,7 +170,7 @@ describe('undoableActions', () => {
     expect(store.getState().canRedo).toStrictEqual(false)
   })
 
-  it('should clear future on new action after undo', () => {
+  it.concurrent('should clear future on new action after undo', () => {
     const store = createStore(undoableActions(baseReducer))
     store.dispatch({ type: 'counter/increment' })
     store.dispatch({ type: 'counter/increment' })
@@ -186,7 +189,7 @@ describe('undoableActions', () => {
     expect(store.getState().canRedo).toStrictEqual(false)
   })
 
-  it('hydrates state with actions', () => {
+  it.concurrent('hydrates state with actions', () => {
     const store = createStore(undoableActions(baseReducer))
 
     const actions: HistoryAction<UnknownAction>[] = [
@@ -223,7 +226,7 @@ describe('undoableActions', () => {
     expect(store.getState().canRedo).toStrictEqual(true)
   })
 
-  it('can export and later hydrate state with actions', () => {
+  it.concurrent('can export and later hydrate state with actions', () => {
     let store = createStore(undoableActions(baseReducer))
 
     store.dispatch({ type: 'counter/increment', payload: 10 })
@@ -249,36 +252,39 @@ describe('undoableActions', () => {
     expect(store.getState().canRedo).toStrictEqual(false)
   })
 
-  it('should not track actions that do not change the state of the reducer', () => {
-    const store = createStore(undoableActions(baseReducer))
+  it.concurrent(
+    'should not track actions that do not change the state of the reducer',
+    () => {
+      const store = createStore(undoableActions(baseReducer))
 
-    store.dispatch({ type: 'counter/increment', payload: 1 })
-    expectCount(store, 1)
-    expectHistoryActions(store, [
-      { action: { type: 'counter/increment', payload: 1 }, skipped: false },
-    ])
+      store.dispatch({ type: 'counter/increment', payload: 1 })
+      expectCount(store, 1)
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment', payload: 1 }, skipped: false },
+      ])
 
-    // Dispatching an action that does not change the state
-    store.dispatch({ type: 'unknown/action' })
-    expectCount(store, 1)
-    expectHistoryActions(store, [
-      { action: { type: 'counter/increment', payload: 1 }, skipped: false },
-    ])
+      // Dispatching an action that does not change the state
+      store.dispatch({ type: 'unknown/action' })
+      expectCount(store, 1)
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment', payload: 1 }, skipped: false },
+      ])
 
-    // Dispatching another action that does not change the state
-    expect(store.getState().present.name).toStrictEqual('Counter')
-    store.dispatch({
-      type: 'counter/change-name',
-      payload: 'Counter',
-    })
-    expectHistoryActions(store, [
-      { action: { type: 'counter/increment', payload: 1 }, skipped: false },
-    ])
-  })
+      // Dispatching another action that does not change the state
+      expect(store.getState().present.name).toStrictEqual('Counter')
+      store.dispatch({
+        type: 'counter/change-name',
+        payload: 'Counter',
+      })
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment', payload: 1 }, skipped: false },
+      ])
+    },
+  )
 })
 
-describe('undoableActions with custom config', () => {
-  it('should only track actions when the state changes', () => {
+describe.concurrent('undoableActions with custom config', () => {
+  it.concurrent('should only track actions when the state changes', () => {
     const store = createStore(
       undoableActions(baseReducer, {
         undoableActionTypes: ['counter/increment', 'counter/decrement'],
@@ -337,7 +343,7 @@ describe('undoableActions with custom config', () => {
     expect(store.getState().canRedo).toStrictEqual(false)
   })
 
-  it('should only track tracked-actions when config is set', () => {
+  it.concurrent('should only track tracked-actions when config is set', () => {
     const store = createStore(
       undoableActions(baseReducer, {
         trackedActionTypes: [
@@ -389,7 +395,7 @@ describe('undoableActions with custom config', () => {
     expect(store.getState().canRedo).toStrictEqual(true)
   })
 
-  it('should lose state changes if an action is not tracked', () => {
+  it.concurrent('should lose state changes if an action is not tracked', () => {
     const store = createStore(
       undoableActions(baseReducer, {
         trackedActionTypes: ['counter/increment', 'counter/decrement'],
@@ -434,7 +440,7 @@ describe('undoableActions with custom config', () => {
     expect(store.getState().canRedo).toStrictEqual(true)
   })
 
-  it('should not clear future if an action is not undoable', () => {
+  it.concurrent('should not clear future if an action is not undoable', () => {
     const store = createStore(
       undoableActions(baseReducer, {
         trackedActionTypes: ['counter/increment', 'counter/change-name'],

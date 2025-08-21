@@ -24,6 +24,7 @@ export default function createHandler<State, Action extends UnknownAction>(
     initialState,
     undo: (state: HistoryState<State, Action>) => undo(reducer, config, state),
     redo: (state: HistoryState<State, Action>) => redo(reducer, config, state),
+    reset: () => reset(initialState),
     hydrate: (state: HistoryState<State, Action>, action: Action) =>
       hydrate(reducer, config, state, action, initialState),
     trackAfter: (state: HistoryState<State, Action>, action: Action) =>
@@ -121,6 +122,12 @@ function redo<State, Action extends UnknownAction>(
     canUndo: canUndo(config, newActions),
     canRedo: canRedo(config, newActions),
   }
+}
+
+function reset<State, Action extends UnknownAction>(
+  initialState: HistoryState<State, Action>,
+): HistoryState<State, Action> {
+  return initialState
 }
 
 function hydrate<State, Action extends UnknownAction>(

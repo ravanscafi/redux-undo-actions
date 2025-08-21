@@ -44,6 +44,7 @@ export interface UndoableActionsConfig {
   undoableActionTypes: UnknownAction['type'][]
   undoActionType: UnknownAction['type']
   redoActionType: UnknownAction['type']
+  resetActionType: UnknownAction['type']
   hydrateActionType: UnknownAction['type']
   trackAfterActionType: UnknownAction['type'] | undefined
 }
@@ -51,6 +52,7 @@ export interface UndoableActionsConfig {
 export const initialUndoableActionsConfig: UndoableActionsConfig = {
   undoActionType: ActionTypes.Undo,
   redoActionType: ActionTypes.Redo,
+  resetActionType: ActionTypes.Reset,
   hydrateActionType: ActionTypes.Hydrate,
   undoableActionTypes: [],
   trackedActionTypes: [],

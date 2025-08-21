@@ -18,13 +18,13 @@ flowchart LR
             B(canvas/draw)
         end
         subgraph 3 ["Undoable Action"]
-            C(canvas/zoom-in)
+            C(canvas/zoomIn)
         end
         subgraph 4 ["Undoable Action"]
             D(canvas/draw)
         end
         subgraph 5 ["Undoable Action"]
-            E(canvas/zoom-in)
+            E(canvas/zoomIn)
         end
     end
 
@@ -49,14 +49,14 @@ flowchart LR
             B(canvas/draw)
         end
 
-        C(canvas/zoom-in)
+        C(canvas/zoomIn)
 
         subgraph 4 ["Undoable Action"]
             D(canvas/draw)
         end
 
 
-        E(canvas/zoom-in)
+        E(canvas/zoomIn)
     end
 
     Init --> A
@@ -80,9 +80,9 @@ flowchart LR
             B(canvas/draw)
         end
 
-        C(canvas/zoom-in)
+        C(canvas/zoomIn)
 
-        E(canvas/zoom-in)
+        E(canvas/zoomIn)
     end
 
     Init --> A
@@ -101,9 +101,9 @@ flowchart LR
     subgraph Tracked Actions
         A(canvas/start)
 
-        C(canvas/zoom-in)
+        C(canvas/zoomIn)
 
-        E(canvas/zoom-in)
+        E(canvas/zoomIn)
     end
 
     Init --> A
@@ -120,9 +120,9 @@ flowchart LR
     End@{ shape: framed-circle }
     FA(canvas/start)
     FB(canvas/draw)
-    FC(canvas/zoom-in)
+    FC(canvas/zoomIn)
     FD(canvas/draw)
-    FE(canvas/zoom-in)
+    FE(canvas/zoomIn)
     A(canvas/start)
 
     subgraph Tracked Actions
@@ -130,14 +130,14 @@ flowchart LR
             B(canvas/draw)
         end
 
-        C(canvas/zoom-in)
+        C(canvas/zoomIn)
 
         subgraph 4 ["Undoable Action"]
             D(canvas/draw)
         end
 
 
-        E(canvas/zoom-in)
+        E(canvas/zoomIn)
     end
 
 

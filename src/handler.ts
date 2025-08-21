@@ -14,24 +14,34 @@ import {
 } from './utils'
 import { HISTORY_KEY } from './actions'
 
-export default function createHandler<State, Action extends UnknownAction>(
+export default function createReducer<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   config: UndoableActionsConfig,
-) {
+): Reducer<HistoryState<State, Action>, Action> {
   const initialState = getInitialState(reducer, config)
 
-  return {
-    initialState,
-    undo: (state: HistoryState<State, Action>) => undo(reducer, config, state),
-    redo: (state: HistoryState<State, Action>) => redo(reducer, config, state),
-    reset: (state: HistoryState<State, Action>) =>
-      reset(config, state, initialState),
-    tracking: (state: HistoryState<State, Action>, action: Action) =>
-      setTracking(state, action),
-    trackAfter: (state: HistoryState<State, Action>, action: Action) =>
-      trackAfter(reducer, config, state, action, initialState),
-    handle: (state: HistoryState<State, Action>, action: Action) =>
-      handle(reducer, config, state, action),
+  return function (
+    state: HistoryState<State, Action> | undefined,
+    action: Action,
+  ) {
+    if (!state) {
+      return initialState
+    }
+
+    switch (action.type) {
+      case config.internalActions.undo:
+        return undo(reducer, config, state)
+      case config.internalActions.redo:
+        return redo(reducer, config, state)
+      case config.internalActions.reset:
+        return reset(config, state, initialState)
+      case config.internalActions.tracking:
+        return setTracking(state, action)
+      case config.trackAfterAction:
+        return trackAfter(reducer, config, state, action, initialState)
+      default:
+        return handleAction(reducer, config, state, action)
+    }
   }
 }
 
@@ -152,7 +162,7 @@ function trackAfter<State, Action extends UnknownAction>(
   action: Action,
   initialState: HistoryState<State, Action>,
 ): HistoryState<State, Action> {
-  const newState = handle(reducer, config, state, action)
+  const newState = handleAction(reducer, config, state, action)
 
   return {
     ...initialState,
@@ -165,7 +175,7 @@ function trackAfter<State, Action extends UnknownAction>(
   }
 }
 
-function handle<State, Action extends UnknownAction>(
+function handleAction<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   config: UndoableActionsConfig,
   state: HistoryState<State, Action>,

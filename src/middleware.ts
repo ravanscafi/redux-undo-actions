@@ -1,12 +1,8 @@
 import { isAction, type Middleware, type UnknownAction } from 'redux'
-import {
-  type ExportedHistory,
-  HISTORY_KEY,
-  type HistoryState,
-  type PersistedUndoableActionsConfig,
-  type StoragePersistor,
-} from './types'
-import { exportHistory, isActionTracked } from './utils'
+import { type HistoryState, type PersistedUndoableActionsConfig } from './types'
+import { isActionTracked } from './utils'
+import { loadHistory, removeHistory, saveHistory } from './storage'
+import { HISTORY_KEY } from './actions'
 
 export const createPersistenceMiddleware = (
   config: PersistedUndoableActionsConfig,
@@ -23,43 +19,54 @@ export const createPersistenceMiddleware = (
       )
     }
 
-    if (canUseStorage && action.type === config.resetActionType) {
-      canUseStorage = false
-      await removeHistory(
-        storage,
-        getStorageKey(() => storeAPI.getState()),
-      )
-      canUseStorage = true
-      return next(action)
-    }
-
-    if (!isTracked(action)) {
-      return next(action)
-    }
-
     const previousState = storeAPI.getState() as Record<
       string,
       HistoryState<unknown, UnknownAction>
     >
-
-    // not to future self: don't move this line above the previousState
-    // assignment otherwise we will not have the previous state
+    // after grabbing the previous state, we can call next
     const returnValue = next(action)
 
-    const currentState = storeAPI.getState() as Record<
-      string,
-      HistoryState<unknown, UnknownAction>
-    >
+    if (canUseStorage && action.type === config.internalActions.reset) {
+      canUseStorage = false
+      await removeHistory(
+        storage,
+        getStorageKey(() => previousState),
+      )
+      canUseStorage = true
 
-    if (action.type === config.trackAfterActionType && canUseStorage) {
+      // no need to continue
+      return returnValue
+    }
+
+    if (canUseStorage && action.type === config.trackAfterAction) {
       canUseStorage = false
       const history = await loadHistory(
         storage,
         getStorageKey(() => storeAPI.getState()),
       )
       if (history !== undefined) {
-        // todo: async hydration calling dispatch
-        storeAPI.dispatch({ type: config.hydrateActionType, payload: history })
+        storeAPI.dispatch({
+          type: config.internalActions.tracking,
+          payload: true,
+        })
+
+        history.actions.forEach(({ action }) => {
+          storeAPI.dispatch(action)
+        })
+
+        // todo: maybe we should track undo/redos and then there's no need to do this (or maybe just undos? - one more case of the actions "simplifier" - actions that null each other out)
+        history.actions
+          .filter(({ skipped }) => skipped)
+          .forEach(() => {
+            storeAPI.dispatch({ type: config.internalActions.undo })
+          })
+
+        if (!history.tracking) {
+          storeAPI.dispatch({
+            type: config.internalActions.tracking,
+            payload: false,
+          })
+        }
       }
 
       if (dispatchAfterMaybeLoading) {
@@ -76,6 +83,15 @@ export const createPersistenceMiddleware = (
       return returnValue
     }
 
+    if (!isTracked(action) || !canUseStorage) {
+      return returnValue
+    }
+
+    const currentState = storeAPI.getState() as Record<
+      string,
+      HistoryState<unknown, UnknownAction>
+    >
+
     if (
       !isHistoryState(previousState, reducerKey) ||
       !isHistoryState(currentState, reducerKey)
@@ -90,57 +106,22 @@ export const createPersistenceMiddleware = (
     const currentHistory = currentState[reducerKey][HISTORY_KEY]
 
     if (
-      canUseStorage &&
-      (currentHistory.tracking !== previousHistory.tracking ||
-        (currentHistory.actions.length > 0 &&
-          currentHistory.actions !== previousHistory.actions))
+      currentHistory.tracking !== previousHistory.tracking ||
+      (currentHistory.actions.length > 0 &&
+        currentHistory.actions !== previousHistory.actions)
     ) {
       canUseStorage = false
-      const history = exportHistory(currentState[reducerKey])
 
       const storageKey = getStorageKey(() => storeAPI.getState())
+      const history = {
+        actions: currentHistory.actions,
+        tracking: currentHistory.tracking,
+      }
       await saveHistory(storage, storageKey, history)
       canUseStorage = true
     }
 
     return returnValue
-  }
-}
-
-const saveHistory = async <State, Action extends UnknownAction>(
-  storage: StoragePersistor,
-  storageKey: string,
-  history: ExportedHistory<State, Action>,
-) => {
-  try {
-    await storage.setItem(storageKey, JSON.stringify(history))
-  } catch (e) {
-    console.warn('failed to save history to storage', e)
-  }
-}
-
-const removeHistory = async (storage: StoragePersistor, storageKey: string) => {
-  try {
-    await storage.removeItem(storageKey)
-  } catch (e) {
-    console.warn('failed to remove history from storage', e)
-  }
-}
-
-const loadHistory = async <State, Action extends UnknownAction>(
-  storage: StoragePersistor,
-  storageKey: string,
-): Promise<ExportedHistory<State, Action> | undefined> => {
-  try {
-    const raw = await storage.getItem(storageKey)
-    if (!raw) {
-      return undefined
-    }
-
-    return JSON.parse(raw) as ExportedHistory<State, Action>
-  } catch (e) {
-    console.warn('failed to load history from storage', e)
-    return undefined
   }
 }
 

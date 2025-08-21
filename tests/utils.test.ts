@@ -3,15 +3,13 @@ import {
   canRedo,
   canUndo,
   deepEqual,
-  exportHistory,
   isActionTracked,
   isActionUndoable,
 } from '../src/utils'
-import { HISTORY_KEY } from '../src/types'
 
 describe.concurrent('canUndo', () => {
   const config = {
-    undoableActionTypes: ['file/add', 'file/remove'],
+    undoableActions: ['file/add', 'file/remove'],
   }
   const actions = [
     { action: { type: 'file/add' }, skipped: false },
@@ -34,7 +32,7 @@ describe.concurrent('canUndo', () => {
 })
 
 describe.concurrent('canRedo', () => {
-  const config = { undoableActionTypes: ['file/add', 'file/remove'] }
+  const config = { undoableActions: ['file/add', 'file/remove'] }
   const actions = [
     { action: { type: 'file/add' }, skipped: false },
     { action: { type: 'file/remove' }, skipped: true },
@@ -51,7 +49,7 @@ describe.concurrent('canRedo', () => {
 })
 
 describe.concurrent('isActionUndoable', () => {
-  const config = { undoableActionTypes: ['file/add', 'file/remove'] }
+  const config = { undoableActions: ['file/add', 'file/remove'] }
 
   it.concurrent('returns true for undoable action', () => {
     expect(isActionUndoable(config, { type: 'file/add' })).toBe(true)
@@ -61,15 +59,15 @@ describe.concurrent('isActionUndoable', () => {
     expect(isActionUndoable(config, { type: 'file/update' })).toBe(false)
   })
 
-  it.concurrent('returns true if undoableActionTypes is empty', () => {
+  it.concurrent('returns true if undoableActions is empty', () => {
     expect(
-      isActionUndoable({ undoableActionTypes: [] }, { type: 'file/open' }),
+      isActionUndoable({ undoableActions: [] }, { type: 'file/open' }),
     ).toBe(true)
   })
 })
 
 describe.concurrent('isActionTracked', () => {
-  const config = { trackedActionTypes: ['file/add', 'file/remove'] }
+  const config = { trackedActions: ['file/add', 'file/remove'] }
 
   it.concurrent('returns true for tracked action', () => {
     expect(isActionTracked(config, { type: 'file/add' })).toBe(true)
@@ -79,85 +77,11 @@ describe.concurrent('isActionTracked', () => {
     expect(isActionTracked(config, { type: 'file/update' })).toBe(false)
   })
 
-  it.concurrent('returns true if trackedActionTypes is empty', () => {
-    expect(
-      isActionTracked({ trackedActionTypes: [] }, { type: 'file/open' }),
-    ).toBe(true)
+  it.concurrent('returns true if trackedActions is empty', () => {
+    expect(isActionTracked({ trackedActions: [] }, { type: 'file/open' })).toBe(
+      true,
+    )
   })
-})
-
-describe.concurrent('exportHistory', () => {
-  it.concurrent('exports a serializable snapshot of history state', () => {
-    const historyState = {
-      [HISTORY_KEY]: {
-        actions: [
-          { action: { type: 'file/add', payload: 1 }, skipped: false },
-          { action: { type: 'file/remove', payload: 2 }, skipped: true },
-        ],
-        tracking: true,
-        snapshot: { some: 'data' },
-      },
-      present: { some: 'state' },
-      canUndo: true,
-      canRedo: true,
-    }
-    const exported = exportHistory(historyState)
-    expect(exported).toEqual({
-      actions: [
-        { action: { type: 'file/add', payload: 1 }, skipped: false },
-        { action: { type: 'file/remove', payload: 2 }, skipped: true },
-      ],
-      tracking: true,
-    })
-    // Should be serializable
-    expect(() => JSON.stringify(exported)).not.toThrow()
-  })
-
-  it.concurrent('handles empty actions and tracking', () => {
-    const historyState = {
-      [HISTORY_KEY]: {
-        actions: [],
-        tracking: false,
-        snapshot: { some: 'data' },
-      },
-      present: { some: 'state' },
-      canUndo: false,
-      canRedo: false,
-    }
-    const exported = exportHistory(historyState)
-    expect(exported).toEqual({ actions: [], tracking: false })
-  })
-
-  it.concurrent(
-    'falls back to JSON.parse if structuredClone is unavailable',
-    () => {
-      const originalStructuredClone = globalThis.structuredClone
-      delete (globalThis as Partial<typeof globalThis>).structuredClone
-
-      const historyState = {
-        [HISTORY_KEY]: {
-          actions: [
-            { action: { type: 'file/add', payload: 123 }, skipped: false },
-          ],
-          tracking: true,
-          snapshot: { some: 'data' },
-        },
-        present: { some: 'state' },
-        canUndo: true,
-        canRedo: false,
-      }
-      const exported = exportHistory(historyState)
-      expect(exported).toEqual({
-        actions: [
-          { action: { type: 'file/add', payload: 123 }, skipped: false },
-        ],
-        tracking: true,
-      })
-      expect(() => JSON.stringify(exported)).not.toThrow()
-
-      globalThis.structuredClone = originalStructuredClone
-    },
-  )
 })
 
 describe.concurrent('deepEqual', () => {

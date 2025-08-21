@@ -1,5 +1,5 @@
 import type { UnknownAction } from 'redux'
-import { ActionTypes } from './actions'
+import { ActionTypes, HISTORY_KEY } from './actions'
 
 export interface HistoryAction<Action extends UnknownAction> {
   action: Action
@@ -11,8 +11,6 @@ export interface History<State, Action extends UnknownAction> {
   actions: HistoryAction<Action>[]
   snapshot: State
 }
-
-export const HISTORY_KEY = '__redux_undo_actions_history'
 
 export interface HistoryState<State, Action extends UnknownAction> {
   present: State
@@ -40,25 +38,37 @@ export interface StoragePersistor {
 }
 
 export interface UndoableActionsConfig {
-  trackedActionTypes: UnknownAction['type'][]
-  undoableActionTypes: UnknownAction['type'][]
-  undoActionType: UnknownAction['type']
-  redoActionType: UnknownAction['type']
-  resetActionType: UnknownAction['type']
-  hydrateActionType: UnknownAction['type']
-  trackAfterActionType: UnknownAction['type'] | undefined
+  trackedActions: UnknownAction['type'][]
+  undoableActions: UnknownAction['type'][]
+  trackAfterAction: UnknownAction['type'] | undefined
+  internalActions: {
+    undo: UnknownAction['type']
+    redo: UnknownAction['type']
+    reset: UnknownAction['type']
+    tracking: UnknownAction['type']
+  }
 }
 
 export const initialUndoableActionsConfig: UndoableActionsConfig = {
-  undoActionType: ActionTypes.Undo,
-  redoActionType: ActionTypes.Redo,
-  resetActionType: ActionTypes.Reset,
-  hydrateActionType: ActionTypes.Hydrate,
-  undoableActionTypes: [],
-  trackedActionTypes: [],
-  trackAfterActionType: undefined,
+  trackedActions: [],
+  undoableActions: [],
+  trackAfterAction: undefined,
+  internalActions: {
+    undo: ActionTypes.Undo,
+    redo: ActionTypes.Redo,
+    reset: ActionTypes.Reset,
+    tracking: ActionTypes.Tracking,
+  },
 }
 
 export type PersistedUndoableActionsConfig = UndoableActionsConfig & {
   persistence: Persistence
 }
+
+type DeepPartial<T> = T extends object
+  ? T extends unknown[]
+    ? T
+    : { [K in keyof T]?: DeepPartial<T[K]> }
+  : T
+
+export type PartialUndoableActionsConfig = DeepPartial<UndoableActionsConfig>

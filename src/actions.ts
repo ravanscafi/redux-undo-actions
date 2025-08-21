@@ -1,21 +1,20 @@
 import type { UnknownAction } from 'redux'
-import type { ExportedHistory } from './types'
+import type { History } from './types'
+
+export const HISTORY_KEY = '@@redux-undo-actions'
 
 export const ActionTypes = {
-  Undo: '@@redux-undo-actions/undo',
-  Redo: '@@redux-undo-actions/redo',
-  Reset: '@@redux-undo-actions/reset',
-  Hydrate: '@@redux-undo-actions/hydrate',
+  Undo: `${HISTORY_KEY}/undo`,
+  Redo: `${HISTORY_KEY}/redo`,
+  Reset: `${HISTORY_KEY}/reset`,
+  Tracking: `${HISTORY_KEY}/tracking`,
 }
 
 export const ActionCreators = {
   undo: (): UnknownAction => ({ type: ActionTypes.Undo }),
   redo: (): UnknownAction => ({ type: ActionTypes.Redo }),
   reset: (): UnknownAction => ({ type: ActionTypes.Reset }),
-  hydrate: <State, Action extends UnknownAction>(
-    payload: ExportedHistory<State, Action>,
-  ): UnknownAction => ({
-    type: ActionTypes.Hydrate,
-    payload,
-  }),
+  tracking: <State, Action extends UnknownAction>(
+    payload: History<State, Action>['tracking'],
+  ): UnknownAction => ({ type: ActionTypes.Tracking, payload }),
 }

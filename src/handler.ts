@@ -1,7 +1,6 @@
 import type { Reducer, UnknownAction } from 'redux'
 import {
-  type ExportedHistory,
-  HISTORY_KEY,
+  type History,
   type HistoryAction,
   type HistoryState,
   type UndoableActionsConfig,
@@ -13,6 +12,7 @@ import {
   isActionTracked,
   isActionUndoable,
 } from './utils'
+import { HISTORY_KEY } from './actions'
 
 export default function createHandler<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
@@ -25,8 +25,8 @@ export default function createHandler<State, Action extends UnknownAction>(
     undo: (state: HistoryState<State, Action>) => undo(reducer, config, state),
     redo: (state: HistoryState<State, Action>) => redo(reducer, config, state),
     reset: () => reset(initialState),
-    hydrate: (state: HistoryState<State, Action>, action: Action) =>
-      hydrate(reducer, config, state, action, initialState),
+    tracking: (state: HistoryState<State, Action>, action: Action) =>
+      setTracking(state, action),
     trackAfter: (state: HistoryState<State, Action>, action: Action) =>
       trackAfter(reducer, config, state, action, initialState),
     handle: (state: HistoryState<State, Action>, action: Action) =>
@@ -43,7 +43,7 @@ function getInitialState<State, Action extends UnknownAction>(
   return {
     present: initialPresent,
     [HISTORY_KEY]: {
-      tracking: config.trackAfterActionType === undefined,
+      tracking: config.trackAfterAction === undefined,
       actions: [],
       snapshot: initialPresent,
     },
@@ -130,34 +130,6 @@ function reset<State, Action extends UnknownAction>(
   return initialState
 }
 
-function hydrate<State, Action extends UnknownAction>(
-  reducer: Reducer<State, Action>,
-  config: UndoableActionsConfig,
-  state: HistoryState<State, Action>,
-  action: Action,
-  initialState: HistoryState<State, Action>,
-): HistoryState<State, Action> {
-  const { payload } = action
-  const { actions = [], tracking = true } = payload as ExportedHistory<
-    State,
-    Action
-  >
-
-  const newPresent = replay(reducer, actions, state.present)
-
-  return {
-    ...initialState,
-    [HISTORY_KEY]: {
-      tracking,
-      actions,
-      snapshot: state.present,
-    },
-    present: newPresent,
-    canUndo: canUndo(config, actions),
-    canRedo: canRedo(config, actions),
-  }
-}
-
 function trackAfter<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   config: UndoableActionsConfig,
@@ -214,6 +186,22 @@ function handle<State, Action extends UnknownAction>(
     present: newPresent,
     canUndo: canUndo(config, newActions),
     canRedo: canRedo(config, newActions),
+  }
+}
+
+function setTracking<State, Action extends UnknownAction>(
+  state: HistoryState<State, Action>,
+  action: Action,
+): HistoryState<State, Action> {
+  const { payload } = action
+  const tracking = payload as History<State, Action>['tracking']
+
+  return {
+    ...state,
+    [HISTORY_KEY]: {
+      ...state[HISTORY_KEY],
+      tracking,
+    },
   }
 }
 

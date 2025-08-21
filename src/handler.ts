@@ -24,7 +24,8 @@ export default function createHandler<State, Action extends UnknownAction>(
     initialState,
     undo: (state: HistoryState<State, Action>) => undo(reducer, config, state),
     redo: (state: HistoryState<State, Action>) => redo(reducer, config, state),
-    reset: () => reset(initialState),
+    reset: (state: HistoryState<State, Action>) =>
+      reset(config, state, initialState),
     tracking: (state: HistoryState<State, Action>, action: Action) =>
       setTracking(state, action),
     trackAfter: (state: HistoryState<State, Action>, action: Action) =>
@@ -65,12 +66,12 @@ function undo<State, Action extends UnknownAction>(
   }
 
   const lastUndoableIndex = actions.findLastIndex(
-    (a) => !a.skipped && isActionUndoable(config, a.action),
+    (a) => !a.undone && isActionUndoable(config, a.action),
   )
 
   const newActions = actions.toSpliced(lastUndoableIndex, 1, {
     ...actions[lastUndoableIndex],
-    skipped: true,
+    undone: true,
   })
 
   const present = replay(reducer, newActions, history.snapshot)
@@ -100,12 +101,12 @@ function redo<State, Action extends UnknownAction>(
   }
 
   const firstUndoableIndex = actions.findIndex(
-    (a) => a.skipped && isActionUndoable(config, a.action),
+    (a) => a.undone && isActionUndoable(config, a.action),
   )
 
   const newActions = actions.toSpliced(firstUndoableIndex, 1, {
     ...actions[firstUndoableIndex],
-    skipped: false,
+    undone: false,
   })
 
   let newPresent: State
@@ -125,9 +126,23 @@ function redo<State, Action extends UnknownAction>(
 }
 
 function reset<State, Action extends UnknownAction>(
+  config: UndoableActionsConfig,
+  state: HistoryState<State, Action>,
   initialState: HistoryState<State, Action>,
 ): HistoryState<State, Action> {
-  return initialState
+  if (config.trackAfterAction === undefined) {
+    return initialState
+  }
+
+  return {
+    ...initialState,
+    [HISTORY_KEY]: {
+      ...initialState[HISTORY_KEY],
+      tracking: state[HISTORY_KEY].tracking,
+      snapshot: state[HISTORY_KEY].snapshot,
+    },
+    present: state[HISTORY_KEY].snapshot,
+  }
 }
 
 function trackAfter<State, Action extends UnknownAction>(
@@ -138,6 +153,7 @@ function trackAfter<State, Action extends UnknownAction>(
   initialState: HistoryState<State, Action>,
 ): HistoryState<State, Action> {
   const newState = handle(reducer, config, state, action)
+
   return {
     ...initialState,
     [HISTORY_KEY]: {
@@ -172,10 +188,10 @@ function handle<State, Action extends UnknownAction>(
     }
   }
 
-  let newActions = [...actions, { action, skipped: false }]
+  let newActions = [...actions, { action, undone: false }]
   if (isActionUndoable(config, action)) {
     // clean future actions
-    newActions = newActions.filter((a) => !a.skipped)
+    newActions = newActions.filter((a) => !a.undone)
   }
 
   return {
@@ -211,6 +227,6 @@ function replay<State, Action extends UnknownAction>(
   initialState: State,
 ): State {
   return newActions
-    .filter((a) => !a.skipped)
+    .filter((a) => !a.undone)
     .reduce((accState, a) => reducer(accState, a.action), initialState)
 }

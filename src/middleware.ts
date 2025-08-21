@@ -56,7 +56,7 @@ export const createPersistenceMiddleware = (
 
         // todo: maybe we should track undo/redos and then there's no need to do this (or maybe just undos? - one more case of the actions "simplifier" - actions that null each other out)
         history.actions
-          .filter(({ skipped }) => skipped)
+          .filter(({ undone }) => undone)
           .forEach(() => {
             storeAPI.dispatch({ type: config.internalActions.undo })
           })

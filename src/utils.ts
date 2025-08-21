@@ -9,7 +9,7 @@ export function canUndo<State, Action extends UnknownAction>(
   config: Pick<UndoableActionsConfig, 'undoableActions'>,
   actions: History<State, Action>['actions'],
 ): boolean {
-  actions = actions.filter((a: HistoryAction<Action>) => !a.skipped)
+  actions = actions.filter((a: HistoryAction<Action>) => !a.undone)
 
   if (actions.length === 0) {
     return false
@@ -27,7 +27,7 @@ export function canRedo<State, Action extends UnknownAction>(
   _: Pick<UndoableActionsConfig, 'undoableActions'>,
   actions: History<State, Action>['actions'],
 ): boolean {
-  return actions.some((action: HistoryAction<Action>) => action.skipped)
+  return actions.some((action: HistoryAction<Action>) => action.undone)
 }
 
 export function isActionUndoable(

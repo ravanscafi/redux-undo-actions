@@ -28,7 +28,7 @@ const counterReducer = (
       }
     case 'counter/start':
       return { ...state, count: action.payload as number }
-    case 'counter/change-name':
+    case 'counter/changeName':
       return { ...state, name: action.payload as string }
     default:
       return state
@@ -163,7 +163,7 @@ describe.concurrent('undoableActions', () => {
     const store = createStore(undoableActions(counterReducer))
     const action = { type: 'counter/increment', payload: 10 }
     store.dispatch(action)
-    expectHistoryActions(store, [{ action, skipped: false }])
+    expectHistoryActions(store, [{ action, undone: false }])
     expectCount(store, 10)
     expect(store.getState().canUndo).toStrictEqual(true)
     expect(store.getState().canRedo).toStrictEqual(false)
@@ -196,24 +196,24 @@ describe.concurrent('undoableActions', () => {
       store.dispatch({ type: 'counter/increment', payload: 1 })
       expectCount(store, 1)
       expectHistoryActions(store, [
-        { action: { type: 'counter/increment', payload: 1 }, skipped: false },
+        { action: { type: 'counter/increment', payload: 1 }, undone: false },
       ])
 
       // Dispatching an action that does not change the state
       store.dispatch({ type: 'unknown/action' })
       expectCount(store, 1)
       expectHistoryActions(store, [
-        { action: { type: 'counter/increment', payload: 1 }, skipped: false },
+        { action: { type: 'counter/increment', payload: 1 }, undone: false },
       ])
 
       // Dispatching another action that does not change the state
       expect(store.getState().present.name).toStrictEqual('Counter')
       store.dispatch({
-        type: 'counter/change-name',
+        type: 'counter/changeName',
         payload: 'Counter',
       })
       expectHistoryActions(store, [
-        { action: { type: 'counter/increment', payload: 1 }, skipped: false },
+        { action: { type: 'counter/increment', payload: 1 }, undone: false },
       ])
     },
   )
@@ -254,12 +254,12 @@ describe.concurrent('undoableActions with custom config', () => {
     store.dispatch({ type: 'counter/increment', payload: 5 })
     expectCount(store, 15)
     expectHistoryActions(store, [
-      { action: { type: 'counter/increment', payload: 5 }, skipped: false },
+      { action: { type: 'counter/increment', payload: 5 }, undone: false },
     ])
     expect(store.getState().canUndo).toStrictEqual(true)
     expect(store.getState().canRedo).toStrictEqual(false)
 
-    store.dispatch({ type: 'counter/change-name', payload: 'New Counter Name' })
+    store.dispatch({ type: 'counter/changeName', payload: 'New Counter Name' })
 
     store.dispatch({ type: 'counter/undo' })
     expectCount(store, 10)
@@ -286,7 +286,7 @@ describe.concurrent('undoableActions with custom config', () => {
         trackedActions: [
           'counter/increment',
           'counter/decrement',
-          'counter/change-name',
+          'counter/changeName',
         ],
         undoableActions: ['counter/increment', 'counter/decrement'],
         trackAfterAction: 'counter/start',
@@ -310,18 +310,18 @@ describe.concurrent('undoableActions with custom config', () => {
     store.dispatch({ type: 'counter/increment', payload: 5 })
     expectCount(store, 15)
     expectHistoryActions(store, [
-      { action: { type: 'counter/increment', payload: 5 }, skipped: false },
+      { action: { type: 'counter/increment', payload: 5 }, undone: false },
     ])
     expect(store.getState().canUndo).toStrictEqual(true)
     expect(store.getState().canRedo).toStrictEqual(false)
 
-    store.dispatch({ type: 'counter/change-name', payload: 'New Counter Name' })
+    store.dispatch({ type: 'counter/changeName', payload: 'New Counter Name' })
     expect(store.getState().present.name).toStrictEqual('New Counter Name')
     expectHistoryActions(store, [
-      { action: { type: 'counter/increment', payload: 5 }, skipped: false },
+      { action: { type: 'counter/increment', payload: 5 }, undone: false },
       {
-        action: { type: 'counter/change-name', payload: 'New Counter Name' },
-        skipped: false,
+        action: { type: 'counter/changeName', payload: 'New Counter Name' },
+        undone: false,
       },
     ])
 
@@ -358,20 +358,20 @@ describe.concurrent('undoableActions with custom config', () => {
     store.dispatch({ type: 'counter/increment', payload: 5 })
     expectCount(store, 15)
     expectHistoryActions(store, [
-      { action: { type: 'counter/increment', payload: 5 }, skipped: false },
+      { action: { type: 'counter/increment', payload: 5 }, undone: false },
     ])
     expect(store.getState().canUndo).toStrictEqual(true)
     expect(store.getState().canRedo).toStrictEqual(false)
 
-    store.dispatch({ type: 'counter/change-name', payload: 'New Counter Name' })
+    store.dispatch({ type: 'counter/changeName', payload: 'New Counter Name' })
     expect(store.getState().present.name).toStrictEqual('New Counter Name')
     expectHistoryActions(store, [
-      { action: { type: 'counter/increment', payload: 5 }, skipped: false },
+      { action: { type: 'counter/increment', payload: 5 }, undone: false },
     ])
 
     store.dispatch({ type: ActionTypes.Undo })
     expectCount(store, 10)
-    // Since counter/change-name is not tracked, the change of 'New Counter Name' is ignored/lost
+    // Since counter/changeName is not tracked, the change of 'New Counter Name' is ignored/lost
     expect(store.getState().present.name).toStrictEqual('Counter')
     expect(store.getState().canUndo).toStrictEqual(false)
     expect(store.getState().canRedo).toStrictEqual(true)
@@ -380,7 +380,7 @@ describe.concurrent('undoableActions with custom config', () => {
   it.concurrent('should not clear future if an action is not undoable', () => {
     const store = createStore(
       undoableActions(counterReducer, {
-        trackedActions: ['counter/increment', 'counter/change-name'],
+        trackedActions: ['counter/increment', 'counter/changeName'],
         undoableActions: ['counter/increment'],
       }),
     )
@@ -389,8 +389,8 @@ describe.concurrent('undoableActions with custom config', () => {
     store.dispatch({ type: 'counter/increment', payload: 2 })
     expectCount(store, 3)
     expectHistoryActions(store, [
-      { action: { type: 'counter/increment' }, skipped: false },
-      { action: { type: 'counter/increment', payload: 2 }, skipped: false },
+      { action: { type: 'counter/increment' }, undone: false },
+      { action: { type: 'counter/increment', payload: 2 }, undone: false },
     ])
 
     store.dispatch(ActionCreators.undo())
@@ -398,18 +398,18 @@ describe.concurrent('undoableActions with custom config', () => {
     expect(store.getState().canUndo).toStrictEqual(true)
     expect(store.getState().canRedo).toStrictEqual(true)
     expectHistoryActions(store, [
-      { action: { type: 'counter/increment' }, skipped: false },
-      { action: { type: 'counter/increment', payload: 2 }, skipped: true },
+      { action: { type: 'counter/increment' }, undone: false },
+      { action: { type: 'counter/increment', payload: 2 }, undone: true },
     ])
 
-    store.dispatch({ type: 'counter/change-name', payload: 'The new name' })
+    store.dispatch({ type: 'counter/changeName', payload: 'The new name' })
     expect(store.getState().present.name).toStrictEqual('The new name')
     expectHistoryActions(store, [
-      { action: { type: 'counter/increment' }, skipped: false },
-      { action: { type: 'counter/increment', payload: 2 }, skipped: true },
+      { action: { type: 'counter/increment' }, undone: false },
+      { action: { type: 'counter/increment', payload: 2 }, undone: true },
       {
-        action: { type: 'counter/change-name', payload: 'The new name' },
-        skipped: false,
+        action: { type: 'counter/changeName', payload: 'The new name' },
+        undone: false,
       },
     ])
     expect(store.getState().canUndo).toStrictEqual(true)

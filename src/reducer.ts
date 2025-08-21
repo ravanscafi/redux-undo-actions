@@ -37,7 +37,7 @@ export function undoableActions<State, Action extends UnknownAction>(
       case config.internalActions.redo:
         return redo(state)
       case config.internalActions.reset:
-        return reset()
+        return reset(state)
       case config.internalActions.tracking:
         return tracking(state, action)
       case config.trackAfterAction:

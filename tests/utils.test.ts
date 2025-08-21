@@ -12,9 +12,9 @@ describe.concurrent('canUndo', () => {
     undoableActions: ['file/add', 'file/remove'],
   }
   const actions = [
-    { action: { type: 'file/add' }, skipped: false },
-    { action: { type: 'file/remove' }, skipped: false },
-    { action: { type: 'file/update' }, skipped: false },
+    { action: { type: 'file/add' }, undone: false },
+    { action: { type: 'file/remove' }, undone: false },
+    { action: { type: 'file/update' }, undone: false },
   ]
 
   it.concurrent('returns true if there are undoable actions', () => {
@@ -25,26 +25,26 @@ describe.concurrent('canUndo', () => {
     expect(canUndo(config, [])).toBe(false)
   })
 
-  it.concurrent('returns false if all actions are skipped', () => {
-    const skippedActions = actions.map((a) => ({ ...a, skipped: true }))
-    expect(canUndo(config, skippedActions)).toBe(false)
+  it.concurrent('returns false if all actions are undone', () => {
+    const undoneActions = actions.map((a) => ({ ...a, undone: true }))
+    expect(canUndo(config, undoneActions)).toBe(false)
   })
 })
 
 describe.concurrent('canRedo', () => {
   const config = { undoableActions: ['file/add', 'file/remove'] }
   const actions = [
-    { action: { type: 'file/add' }, skipped: false },
-    { action: { type: 'file/remove' }, skipped: true },
+    { action: { type: 'file/add' }, undone: false },
+    { action: { type: 'file/remove' }, undone: true },
   ]
 
-  it.concurrent('returns true if any action is skipped', () => {
+  it.concurrent('returns true if any action is undone', () => {
     expect(canRedo(config, actions)).toBe(true)
   })
 
-  it.concurrent('returns false if no actions are skipped', () => {
-    const noSkipped = actions.map((a) => ({ ...a, skipped: false }))
-    expect(canRedo(config, noSkipped)).toBe(false)
+  it.concurrent('returns false if no actions are undone', () => {
+    const noUndone = actions.map((a) => ({ ...a, undone: false }))
+    expect(canRedo(config, noUndone)).toBe(false)
   })
 })
 

@@ -43,7 +43,7 @@ describe.concurrent('persistedUndoableActions', () => {
     mockStorage.getItem = vi.fn().mockResolvedValue(
       JSON.stringify({
         tracking: true,
-        actions: [{ action: { type: 'counter/increment' }, skipped: false }],
+        actions: [{ action: { type: 'counter/increment' }, undone: false }],
       }),
     )
 
@@ -56,7 +56,7 @@ describe.concurrent('persistedUndoableActions', () => {
       })
       expect(store.getState().counter[HISTORY_KEY]).toEqual({
         tracking: true,
-        actions: [{ action: { type: 'counter/increment' }, skipped: false }],
+        actions: [{ action: { type: 'counter/increment' }, undone: false }],
         snapshot: { id: 'counter-id', count: 0 },
       })
     })
@@ -86,7 +86,7 @@ describe.concurrent('persistedUndoableActions', () => {
     })
     expect(store.getState().counter[HISTORY_KEY]).toEqual({
       tracking: true,
-      actions: [{ action: { type: 'counter/increment' }, skipped: false }],
+      actions: [{ action: { type: 'counter/increment' }, undone: false }],
       snapshot: { id: 'counter-id', count: 0 },
     })
     // wait for save
@@ -96,31 +96,55 @@ describe.concurrent('persistedUndoableActions', () => {
     )
   })
 
-  it.concurrent('should reset state when clean action happens', async () => {
+  it.concurrent('should reset state when reset action happens', async () => {
     const { store, mockStorage } = getStore({
       internalActions: {
         reset: 'counter/reset',
       },
     })
 
+    // reset state before trackAfterAction happens
+    store.dispatch({ type: 'counter/reset' })
+    expect(store.getState().counter.present).toEqual({
+      ...initialState,
+    })
+    expect(store.getState().counter[HISTORY_KEY]).toEqual({
+      actions: [],
+      tracking: false,
+      snapshot: { ...initialState },
+    })
+
     // prepare some state
-    store.dispatch({ type: 'counter/start' })
+    store.dispatch({ type: 'counter/start', payload: 100 }) //  should be the initial state
+    await vi.waitFor(() => {
+      expect(store.getState().counter[HISTORY_KEY]).toEqual({
+        tracking: true,
+        actions: [],
+        snapshot: { ...initialState, count: 100 },
+      })
+    })
     store.dispatch({ type: 'counter/increment' })
     store.dispatch({ type: 'counter/increment' })
+    expect(store.getState().counter.present.count).toEqual(102)
     await sleep(50)
 
     // reset state
     store.dispatch({ type: 'counter/reset' })
+    await sleep(50)
 
     await vi.waitFor(() => {
-      expect(mockStorage.removeItem).toHaveBeenCalledExactlyOnceWith(
+      expect(mockStorage.removeItem).toHaveBeenNthCalledWith(
+        2,
         'key-counter-id',
       )
-      expect(store.getState().counter.present).toEqual(initialState)
+      expect(store.getState().counter.present).toEqual({
+        ...initialState,
+        count: 100,
+      })
       expect(store.getState().counter[HISTORY_KEY]).toEqual({
-        tracking: false,
         actions: [],
-        snapshot: initialState,
+        tracking: true,
+        snapshot: { ...initialState, count: 100 },
       })
     })
   })
@@ -148,7 +172,7 @@ describe.concurrent('persistedUndoableActions', () => {
     })
     expect(store.getState().counter[HISTORY_KEY]).toEqual({
       tracking: true,
-      actions: [{ action: { type: 'counter/increment' }, skipped: false }],
+      actions: [{ action: { type: 'counter/increment' }, undone: false }],
       snapshot: initialState,
     })
 
@@ -253,7 +277,7 @@ describe.concurrent('persistedUndoableActions', () => {
     expect(store.getState().counter.present).toEqual(initialState)
     expect(store.getState().counter[HISTORY_KEY]).toEqual({
       tracking: true,
-      actions: [{ action: { type: 'counter/increment' }, skipped: false }],
+      actions: [{ action: { type: 'counter/increment' }, undone: false }],
       snapshot: initialState,
     })
   })
@@ -290,16 +314,16 @@ describe.concurrent('persistedUndoableActions', () => {
     const exportedHistory = {
       tracking: false,
       actions: [
-        { action: { type: 'counter/increment' }, skipped: false },
-        { action: { type: 'counter/increment' }, skipped: false },
-        { action: { type: 'counter/increment', payload: 10 }, skipped: true },
+        { action: { type: 'counter/increment' }, undone: false },
+        { action: { type: 'counter/increment' }, undone: false },
+        { action: { type: 'counter/increment', payload: 10 }, undone: true },
       ],
     }
     mockStorage.getItem = vi
       .fn()
       .mockResolvedValue(JSON.stringify(exportedHistory))
 
-    store.dispatch({ type: 'counter/start', payload: { counter: 0 } })
+    store.dispatch({ type: 'counter/start', payload: 0 })
 
     await vi.waitFor(() => {
       expect(store.getState().counter.present.count).toStrictEqual(2)
@@ -358,8 +382,8 @@ function getStore(
           ...state,
           count: state.count - ((action.payload as number) || 1),
         }
-      case 'counter/reset':
-        return initialState
+      case 'counter/start':
+        return { ...state, count: (action.payload as number) || 0 }
       default:
         return state
     }

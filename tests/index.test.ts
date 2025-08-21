@@ -5,11 +5,11 @@ import { legacy_createStore as createStore } from 'redux'
 import {
   ActionCreators,
   ActionTypes,
-  HISTORY_KEY,
   type HistoryAction,
   type HistoryState,
   undoableActions,
 } from '../src'
+import { HISTORY_KEY } from '../src/actions'
 
 const counterReducer = (
   state = { name: 'Counter', count: 0 },

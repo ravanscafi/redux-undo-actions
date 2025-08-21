@@ -7,12 +7,12 @@ import {
 } from 'redux'
 import {
   ActionCreators,
-  HISTORY_KEY,
   type HistoryState,
   type PartialUndoableActionsConfig,
   persistedUndoableActions,
   type Persistence,
 } from '../src'
+import { HISTORY_KEY } from '../src/actions'
 
 interface CounterState {
   id: string

@@ -1,9 +1,5 @@
 import type { UnknownAction } from 'redux'
-import {
-  type History,
-  type HistoryAction,
-  type UndoableActionsConfig,
-} from './types'
+import type { History, HistoryAction, UndoableActionsConfig } from './types'
 
 export function canUndo<State, Action extends UnknownAction>(
   config: Pick<UndoableActionsConfig, 'undoableActions'>,

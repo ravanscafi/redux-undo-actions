@@ -1,9 +1,9 @@
 import type { Reducer, UnknownAction } from 'redux'
-import {
-  type History,
-  type HistoryAction,
-  type HistoryState,
-  type UndoableActionsConfig,
+import type {
+  History,
+  HistoryAction,
+  HistoryState,
+  UndoableActionsConfig,
 } from './types'
 import {
   canRedo,

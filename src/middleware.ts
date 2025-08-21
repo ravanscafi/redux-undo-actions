@@ -1,5 +1,5 @@
 import { isAction, type Middleware, type UnknownAction } from 'redux'
-import { type HistoryState, type PersistedUndoableActionsConfig } from './types'
+import type { HistoryState, PersistedUndoableActionsConfig } from './types'
 import { isActionTracked } from './utils'
 import { loadHistory, removeHistory, saveHistory } from './storage'
 import { HISTORY_KEY } from './actions'

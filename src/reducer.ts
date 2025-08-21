@@ -1,27 +1,18 @@
 import type { Middleware, Reducer, UnknownAction } from 'redux'
-import {
-  type HistoryState,
-  initialUndoableActionsConfig,
-  type PartialUndoableActionsConfig,
-  type PersistedUndoableActionsConfig,
-  type Persistence,
-  type UndoableActionsConfig,
+import type {
+  HistoryState,
+  PartialUndoableActionsConfig,
+  Persistence,
 } from './types'
 import createHandler from './handler'
 import { createPersistenceMiddleware } from './middleware'
+import { getConfig, getConfigWithPersistence } from './config'
 
 export function undoableActions<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   customConfig?: PartialUndoableActionsConfig,
 ): Reducer<HistoryState<State, Action>, Action> {
-  const config: UndoableActionsConfig = {
-    ...initialUndoableActionsConfig,
-    ...customConfig,
-    internalActions: {
-      ...initialUndoableActionsConfig.internalActions,
-      ...customConfig?.internalActions,
-    },
-  }
+  const config = getConfig(customConfig)
 
   const { initialState, undo, redo, reset, tracking, handle, trackAfter } =
     createHandler(reducer, config)
@@ -55,14 +46,7 @@ export function persistedUndoableActions<State, Action extends UnknownAction>(
   reducer: Reducer<HistoryState<State, Action>, Action>
   middleware: Middleware
 } {
-  const config: PersistedUndoableActionsConfig = {
-    ...initialUndoableActionsConfig,
-    ...customConfig,
-    internalActions: {
-      ...initialUndoableActionsConfig.internalActions,
-      ...customConfig.internalActions,
-    },
-  }
+  const config = getConfigWithPersistence(customConfig)
   const wrappedReducer = undoableActions(reducer, customConfig)
   const middleware = createPersistenceMiddleware(config)
 

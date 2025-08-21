@@ -1,5 +1,5 @@
 import type { UnknownAction } from 'redux'
-import { type ExportedHistory, type StoragePersistor } from './types'
+import type { ExportedHistory, StoragePersistor } from './types'
 
 export const saveHistory = async <State, Action extends UnknownAction>(
   storage: StoragePersistor,

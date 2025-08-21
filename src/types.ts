@@ -1,5 +1,5 @@
 import type { UnknownAction } from 'redux'
-import { ActionTypes, HISTORY_KEY } from './actions'
+import { HISTORY_KEY } from './actions'
 
 /**
  * Represents an action in the history stack.
@@ -61,7 +61,7 @@ export interface HistoryState<State, Action extends UnknownAction> {
   /**
    * Internal history tracking data.
    * This should not be modified directly, otherwise it can lead to inconsistent states.
-   * For now, the key is hardcoded, but it might change in the future, or even been hidden.
+   * The key is intentionally not exposed and might change in the future.
    */
   [HISTORY_KEY]: History<State, Action>
 }
@@ -231,18 +231,6 @@ export type PersistedUndoableActionsConfig = UndoableActionsConfig & {
  * The provided properties will override the defaults.
  */
 export type PartialUndoableActionsConfig = DeepPartial<UndoableActionsConfig>
-
-export const initialUndoableActionsConfig: UndoableActionsConfig = {
-  trackedActions: [],
-  undoableActions: [],
-  trackAfterAction: undefined,
-  internalActions: {
-    undo: ActionTypes.Undo,
-    redo: ActionTypes.Redo,
-    reset: ActionTypes.Reset,
-    tracking: ActionTypes.Tracking,
-  },
-}
 
 type DeepPartial<T> = T extends object
   ? T extends unknown[]

@@ -1,8 +1,13 @@
 import type { UnknownAction } from 'redux'
-import type { History } from './types'
 
+/**
+ * The key used to identify the internal actions state.
+ */
 export const HISTORY_KEY = '@@redux-undo-actions'
 
+/**
+ * Action type constants for undo, redo, reset, and tracking actions.
+ */
 export const ActionTypes = {
   Undo: `${HISTORY_KEY}/undo`,
   Redo: `${HISTORY_KEY}/redo`,
@@ -10,11 +15,34 @@ export const ActionTypes = {
   Tracking: `${HISTORY_KEY}/tracking`,
 }
 
+/**
+ * Action creator utilities for undo, redo, reset, and tracking actions.
+ * These utilities only work if the internal actions are not overridden in the configuration.
+ */
 export const ActionCreators = {
+  /**
+   * Creates an undo action.
+   * @returns An action to trigger undo.
+   */
   undo: (): UnknownAction => ({ type: ActionTypes.Undo }),
+  /**
+   * Creates a redo action.
+   * @returns An action to trigger redo.
+   */
   redo: (): UnknownAction => ({ type: ActionTypes.Redo }),
+  /**
+   * Creates a reset action.
+   * @returns An action to reset history.
+   */
   reset: (): UnknownAction => ({ type: ActionTypes.Reset }),
-  tracking: <State, Action extends UnknownAction>(
-    payload: History<State, Action>['tracking'],
-  ): UnknownAction => ({ type: ActionTypes.Tracking, payload }),
+  /**
+   * Creates an action to enable or disable the tracking of actions in history.
+   *
+   * @param payload - If true, enables tracking; if false, disables tracking.
+   * @returns An action to update the tracking state in the undo/redo history.
+   */
+  tracking: (payload: boolean): UnknownAction => ({
+    type: ActionTypes.Tracking,
+    payload,
+  }),
 }

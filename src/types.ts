@@ -3,7 +3,7 @@ import { ActionTypes, HISTORY_KEY } from './actions'
 
 /**
  * Represents an action in the history stack.
- * @template State - The shape of the provided reducer.
+ * @template Action - The Redux action.
  */
 export interface HistoryAction<Action extends UnknownAction> {
   /**
@@ -19,7 +19,7 @@ export interface HistoryAction<Action extends UnknownAction> {
 /**
  * Internal structure for the history tracking.
  * @template State - The shape of the provided reducer.
- * @template Action - The Redux action type.
+ * @template Action - The Redux action.
  */
 export interface History<State, Action extends UnknownAction> {
   /**
@@ -39,7 +39,7 @@ export interface History<State, Action extends UnknownAction> {
 /**
  * The wrapped state shape.
  * @template State - The shape of the provided reducer.
- * @template Action - The Redux action type.
+ * @template Action - The Redux action.
  */
 export interface HistoryState<State, Action extends UnknownAction> {
   /**
@@ -69,7 +69,7 @@ export interface HistoryState<State, Action extends UnknownAction> {
 /**
  * Exported history data for serialization or inspection.
  * @template State - The shape of the provided reducer.
- * @template Action - The Redux action type.
+ * @template Action - The Redux action.
  * @property actions - List of actions in the history stack.
  * @property tracking - Whether history tracking is enabled.
  */

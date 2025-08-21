@@ -88,11 +88,25 @@ export interface Persistence {
    */
   reducerKey: string
   /**
-   * Function to generate a unique storage key based on the current state.
-   * This allows for multiple instances of history tracking in the same application.
-   * The function receives the current state and should return a string key.
+   * Function to generate a unique storage key for persisting history state.
+   *
+   * Receives the current Redux state and returns either:
+   * - a `string` key to use for storage, or
+   * - `false` to disable persistence for this state.
+   *
+   * This enables conditional persistence, such as saving history only for specific entities.
+   *
+   * @param getState - A function that returns the current Redux state.
+   * @returns A unique string key for storage, or `false` to skip persistence.
+   *
+   * @example
+   * // Persist history only for entities with an ID
+   * getStorageKey: (getState) => {
+   *   const state = getState() as { entityId?: string }
+   *   return state.entityId ? `history_${state.entityId}` : false
+   * }
    */
-  getStorageKey: (getState: () => unknown) => string
+  getStorageKey: (getState: () => unknown) => string | false
   /**
    * Custom storage implementation for persisting history state.
    */

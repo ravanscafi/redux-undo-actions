@@ -38,6 +38,44 @@ describe.concurrent('persistedUndoableActions', () => {
     expect(mockStorage.setItem).not.toHaveBeenCalled()
   })
 
+  it.concurrent(
+    'should ignore persistence if no storage key is returned',
+    async () => {
+      const { store, mockStorage } = getStore({
+        persistence: { getStorageKey: () => false },
+      })
+
+      store.dispatch({ type: 'counter/start' })
+      await sleep(50)
+      store.dispatch({ type: 'counter/increment' })
+      await sleep(50)
+      store.dispatch({ type: 'counter/increment' })
+      await sleep(50)
+
+      expect(store.getState().counter[HISTORY_KEY]).toEqual({
+        tracking: true,
+        actions: [
+          { action: { type: 'counter/increment' }, undone: false },
+          { action: { type: 'counter/increment' }, undone: false },
+        ],
+        snapshot: { id: 'counter-id', count: 0 },
+      })
+
+      store.dispatch({ type: 'counter/reset' })
+      await sleep(50)
+
+      expect(store.getState().counter[HISTORY_KEY]).toEqual({
+        tracking: true,
+        actions: [],
+        snapshot: { id: 'counter-id', count: 0 },
+      })
+
+      expect(mockStorage.getItem).not.toHaveBeenCalled()
+      expect(mockStorage.setItem).not.toHaveBeenCalled()
+      expect(mockStorage.removeItem).not.toHaveBeenCalled()
+    },
+  )
+
   it.concurrent('should load state when tracking starts', async () => {
     const { store, mockStorage } = getStore()
     mockStorage.getItem = vi.fn().mockResolvedValue(

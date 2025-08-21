@@ -3,9 +3,13 @@ import type { ExportedHistory, StoragePersistor } from './types'
 
 export const saveHistory = async <State, Action extends UnknownAction>(
   storage: StoragePersistor,
-  storageKey: string,
+  storageKey: string | false,
   history: ExportedHistory<State, Action>,
 ) => {
+  if (storageKey === false) {
+    return
+  }
+
   try {
     await storage.setItem(storageKey, JSON.stringify(history))
   } catch (e) {
@@ -15,8 +19,12 @@ export const saveHistory = async <State, Action extends UnknownAction>(
 
 export const removeHistory = async (
   storage: StoragePersistor,
-  storageKey: string,
+  storageKey: string | false,
 ) => {
+  if (storageKey === false) {
+    return
+  }
+
   try {
     await storage.removeItem(storageKey)
   } catch (e) {
@@ -26,8 +34,12 @@ export const removeHistory = async (
 
 export const loadHistory = async <State, Action extends UnknownAction>(
   storage: StoragePersistor,
-  storageKey: string,
+  storageKey: string | false,
 ): Promise<ExportedHistory<State, Action> | undefined> => {
+  if (storageKey === false) {
+    return undefined
+  }
+
   try {
     const raw = await storage.getItem(storageKey)
     if (!raw) {

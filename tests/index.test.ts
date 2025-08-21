@@ -169,6 +169,19 @@ describe.concurrent('undoableActions', () => {
     expect(store.getState().canRedo).toStrictEqual(false)
   })
 
+  it.concurrent('should reset the state', () => {
+    const store = createStore(undoableActions(counterReducer))
+    store.dispatch({ type: 'counter/increment', payload: 10 })
+    expectHistoryActions(store, [
+      { action: { type: 'counter/increment', payload: 10 }, undone: false },
+    ])
+    expectCount(store, 10)
+
+    store.dispatch(ActionCreators.reset())
+    expectHistoryActions(store, [])
+    expectCount(store, 0)
+  })
+
   it.concurrent('should clear future on new action after undo', () => {
     const store = createStore(undoableActions(counterReducer))
     store.dispatch({ type: 'counter/increment' })

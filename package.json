@@ -35,7 +35,7 @@
     "format-fix": "prettier --cache --write .",
     "lint": "eslint .",
     "lint-fix": "eslint --cache --fix .",
-    "commitlint": "commitlint --edit",
+    "commitlint": "commitlint",
     "release": "bumpp && npm publish",
     "lefthook-install": "lefthook install",
     "lefthook-run": "lefthook run pre-commit"

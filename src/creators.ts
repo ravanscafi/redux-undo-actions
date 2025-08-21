@@ -4,8 +4,8 @@ import type {
   PartialUndoableActionsConfig,
   Persistence,
 } from './types'
-import createReducer from './handler'
-import { createPersistenceMiddleware } from './middleware'
+import createReducer from './reducer'
+import createPersistenceMiddleware from './middleware'
 import { getConfig, getConfigWithPersistence } from './config'
 
 export function undoableActions<State, Action extends UnknownAction>(

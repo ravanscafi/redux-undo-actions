@@ -4,9 +4,9 @@ import { isActionTracked } from './utils'
 import { loadHistory, removeHistory, saveHistory } from './storage'
 import { HISTORY_KEY } from './actions'
 
-export const createPersistenceMiddleware = (
+export default function createPersistenceMiddleware(
   config: PersistedUndoableActionsConfig,
-): Middleware => {
+): Middleware {
   const { reducerKey, getStorageKey, storage, dispatchAfterMaybeLoading } =
     config.persistence
   const isTracked = (action: UnknownAction) => isActionTracked(config, action)

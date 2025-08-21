@@ -15,3 +15,8 @@ pre-commit:
 
     - name: build
       run: npm run build
+
+commit-msg:
+  commands:
+    commitlint:
+      run: npm run commitlint -- {1}

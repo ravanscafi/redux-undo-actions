@@ -35,11 +35,14 @@
     "format-fix": "prettier --cache --write .",
     "lint": "eslint .",
     "lint-fix": "eslint --cache --fix .",
+    "commitlint": "commitlint --edit",
     "release": "bumpp && npm publish",
     "lefthook-install": "lefthook install",
     "lefthook-run": "lefthook run pre-commit"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
     "@eslint/js": "^9.33.0",
     "@types/node": "^24.3.0",
     "@vitest/coverage-v8": "^3.2.4",

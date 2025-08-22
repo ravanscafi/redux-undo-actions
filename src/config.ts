@@ -14,6 +14,7 @@ const initialUndoableActionsConfig: UndoableActionsConfig = {
     undo: ActionTypes.Undo,
     redo: ActionTypes.Redo,
     reset: ActionTypes.Reset,
+    hydrate: ActionTypes.Hydrate,
     tracking: ActionTypes.Tracking,
   },
 }

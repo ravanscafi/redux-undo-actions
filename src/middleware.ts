@@ -43,27 +43,9 @@ export default function createPersistenceMiddleware(
       )
       if (history !== undefined) {
         storeAPI.dispatch({
-          type: config.internalActions.tracking,
-          payload: true,
+          type: config.internalActions.hydrate,
+          payload: history,
         })
-
-        history.actions.forEach(({ action }) => {
-          storeAPI.dispatch(action)
-        })
-
-        // todo: maybe we should track undo/redos and then there's no need to do this (or maybe just undos? - one more case of the actions "simplifier" - actions that null each other out)
-        history.actions
-          .filter(({ undone }) => undone)
-          .forEach(() => {
-            storeAPI.dispatch({ type: config.internalActions.undo })
-          })
-
-        if (!history.tracking) {
-          storeAPI.dispatch({
-            type: config.internalActions.tracking,
-            payload: false,
-          })
-        }
       }
 
       if (dispatchAfterMaybeLoading) {

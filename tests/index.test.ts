@@ -200,6 +200,47 @@ describe.concurrent('undoableActions', () => {
     expect(store.getState().canUndo).toStrictEqual(true)
     expect(store.getState().canRedo).toStrictEqual(false)
   })
+  it.concurrent('hydrates state with actions', () => {
+    const store = createStore(undoableActions(counterReducer))
+
+    const actions: HistoryAction<UnknownAction>[] = [
+      { action: { type: 'counter/increment' }, undone: false },
+      { action: { type: 'counter/increment' }, undone: false },
+      { action: { type: 'counter/increment', payload: 10 }, undone: true },
+    ]
+
+    store.dispatch(ActionCreators.hydrate({ actions, tracking: true }))
+
+    expectCount(store, 2)
+
+    expect(store.getState()[HISTORY_KEY].tracking).toStrictEqual(true)
+    expect(store.getState().canUndo).toStrictEqual(true)
+    expect(store.getState().canRedo).toStrictEqual(true)
+
+    store.dispatch(ActionCreators.redo())
+
+    expectCount(store, 12)
+    expect(store.getState().canUndo).toStrictEqual(true)
+    expect(store.getState().canRedo).toStrictEqual(false)
+
+    store.dispatch(ActionCreators.undo())
+
+    expectCount(store, 2)
+    expect(store.getState().canUndo).toStrictEqual(true)
+    expect(store.getState().canRedo).toStrictEqual(true)
+
+    store.dispatch(ActionCreators.undo())
+
+    expectCount(store, 1)
+    expect(store.getState().canUndo).toStrictEqual(true)
+    expect(store.getState().canRedo).toStrictEqual(true)
+
+    store.dispatch(ActionCreators.undo())
+
+    expectCount(store, 0)
+    expect(store.getState().canUndo).toStrictEqual(false)
+    expect(store.getState().canRedo).toStrictEqual(true)
+  })
 
   it.concurrent(
     'should not track actions that do not change the state of the reducer',

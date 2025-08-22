@@ -1,4 +1,5 @@
 import type { UnknownAction } from 'redux'
+import type { ExportedHistory } from './types'
 
 /**
  * The key used to identify the internal actions state.
@@ -12,6 +13,7 @@ export const ActionTypes = {
   Undo: `${HISTORY_KEY}/undo`,
   Redo: `${HISTORY_KEY}/redo`,
   Reset: `${HISTORY_KEY}/reset`,
+  Hydrate: `${HISTORY_KEY}/hydrate`,
   Tracking: `${HISTORY_KEY}/tracking`,
 }
 
@@ -35,6 +37,13 @@ export const ActionCreators = {
    * @returns An action to reset history.
    */
   reset: (): UnknownAction => ({ type: ActionTypes.Reset }),
+  /**
+   * Creates an action to hydrate the history.
+   * @param payload
+   */
+  hydrate: <State, Action extends UnknownAction>(
+    payload: ExportedHistory<State, Action>,
+  ): UnknownAction => ({ type: ActionTypes.Hydrate, payload }),
   /**
    * Creates an action to enable or disable the tracking of actions in history.
    *

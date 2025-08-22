@@ -225,6 +225,12 @@ export interface UndoableActionsConfig {
      */
     reset: UnknownAction['type']
     /**
+     * Action type for the hydrate operation.
+     * Dispatching this action will apply the actions on the state.
+     * @default {@link ActionTypes.Hydrate}
+     */
+    hydrate: UnknownAction['type']
+    /**
      * Action type for the tracking operation.
      * Dispatching this action toggles the tracking state.
      * @default {@link ActionTypes.Tracking}

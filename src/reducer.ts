@@ -1,5 +1,6 @@
 import type { Reducer, UnknownAction } from 'redux'
 import type {
+  ExportedHistory,
   History,
   HistoryAction,
   HistoryState,
@@ -35,6 +36,8 @@ export default function createReducer<State, Action extends UnknownAction>(
         return redo(reducer, config, state)
       case config.internalActions.reset:
         return reset(config, state, initialState)
+      case config.internalActions.hydrate:
+        return hydrate(reducer, config, state, action, initialState)
       case config.internalActions.tracking:
         return setTracking(state, action)
       case config.trackAfterAction:
@@ -212,6 +215,34 @@ function handleAction<State, Action extends UnknownAction>(
     present: newPresent,
     canUndo: canUndo(config, newActions),
     canRedo: canRedo(config, newActions),
+  }
+}
+function hydrate<State, Action extends UnknownAction>(
+  reducer: Reducer<State, Action>,
+  config: UndoableActionsConfig,
+  state: HistoryState<State, Action>,
+  action: Action,
+  initialState: HistoryState<State, Action>,
+): HistoryState<State, Action> {
+  const { payload } = action
+  const { actions = [], tracking = true } = payload as ExportedHistory<
+    State,
+    Action
+  >
+
+  const newPresent = replay(reducer, actions, state.present)
+
+  return {
+    ...initialState,
+    [HISTORY_KEY]: {
+      ...initialState[HISTORY_KEY],
+      tracking,
+      actions,
+      snapshot: state.present,
+    },
+    present: newPresent,
+    canUndo: canUndo(config, actions),
+    canRedo: canRedo(config, actions),
   }
 }
 

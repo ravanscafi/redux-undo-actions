@@ -1,5 +1,5 @@
 import { isAction, type Middleware, type UnknownAction } from 'redux'
-import type { HistoryState, PersistedUndoableActionsConfig } from './types'
+import type { History, PersistedUndoableActionsConfig } from './types'
 import { isActionTracked } from './utils'
 import { loadHistory, removeHistory, saveHistory } from './storage'
 import { HISTORY_KEY } from './actions'
@@ -19,10 +19,7 @@ export default function createPersistenceMiddleware(
       )
     }
 
-    const previousState = storeAPI.getState() as Record<
-      string,
-      HistoryState<unknown, UnknownAction>
-    >
+    const previousState: unknown = storeAPI.getState()
     // after grabbing the previous state, we can call next
     const returnValue = next(action)
 
@@ -87,23 +84,10 @@ export default function createPersistenceMiddleware(
       return returnValue
     }
 
-    const currentState = storeAPI.getState() as Record<
-      string,
-      HistoryState<unknown, UnknownAction>
-    >
+    const currentState: unknown = storeAPI.getState()
 
-    if (
-      !isHistoryState(previousState, reducerKey) ||
-      !isHistoryState(currentState, reducerKey)
-    ) {
-      throw new Error(
-        'Unexpected state structure, make sure you provided the correct reducerKey: ' +
-          reducerKey,
-      )
-    }
-
-    const previousHistory = previousState[reducerKey][HISTORY_KEY]
-    const currentHistory = currentState[reducerKey][HISTORY_KEY]
+    const previousHistory = getHistoryState(previousState, reducerKey)
+    const currentHistory = getHistoryState(currentState, reducerKey)
 
     if (
       currentHistory.tracking !== previousHistory.tracking ||
@@ -125,19 +109,36 @@ export default function createPersistenceMiddleware(
   }
 }
 
-function isHistoryState(
+function getHistoryState(
   obj: unknown,
-  reducerKey: string,
-): obj is { [reducerKey]: HistoryState<unknown, UnknownAction> } {
-  if (typeof obj !== 'object' || obj === null || !(reducerKey in obj)) {
-    return false
+  reducerKey: string | false,
+): History<unknown, UnknownAction> {
+  const error = new Error(
+    'Unexpected state structure, make sure you provided the correct reducerKey: ' +
+      (reducerKey || 'false'),
+  )
+
+  if (typeof obj !== 'object' || obj === null) {
+    throw error
+  }
+
+  if (reducerKey === false && HISTORY_KEY in obj) {
+    return obj[HISTORY_KEY] as History<unknown, UnknownAction>
+  }
+
+  if (reducerKey === false || !(reducerKey in obj)) {
+    throw error
   }
 
   const reducerValue = (obj as Record<string, unknown>)[reducerKey]
 
-  return (
+  if (
     typeof reducerValue === 'object' &&
     reducerValue !== null &&
     HISTORY_KEY in reducerValue
-  )
+  ) {
+    return reducerValue[HISTORY_KEY] as History<unknown, UnknownAction>
+  }
+
+  throw error
 }

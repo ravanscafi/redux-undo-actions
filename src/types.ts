@@ -85,8 +85,9 @@ export interface Persistence {
   /**
    * The key under which the history reducer is stored in the Redux state tree.
    * This should match the key used when creating the reducer.
+   * If using it directly in the root reducer, the reducer key should be false.
    */
-  reducerKey: string
+  reducerKey: string | false
   /**
    * Function to generate a unique storage key for persisting history state.
    *

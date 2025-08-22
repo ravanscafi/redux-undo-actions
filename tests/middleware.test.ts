@@ -281,18 +281,6 @@ describe.concurrent('persistedUndoableActions', () => {
     )
   })
 
-  it.concurrent('should identify wrongly configured reducer key', async () => {
-    const { store } = getStore({
-      trackAfterAction: undefined,
-      persistence: { reducerKey: 'wrongKey' },
-    })
-    await expect(() =>
-      store.dispatch({ type: 'counter/decrement' }),
-    ).rejects.toThrow(
-      'Unexpected state structure, make sure you provided the correct reducerKey: wrongKey',
-    )
-  })
-
   it.concurrent('should ignore untracked actions', () => {
     const { store } = getStore({
       trackAfterAction: undefined,
@@ -400,7 +388,140 @@ describe.concurrent('persistedUndoableActions', () => {
   })
 })
 
-function getStore(
+describe.concurrent('configuration validation', () => {
+  it.concurrent('should identify a non-existing reducer key', async () => {
+    const { store } = getStore({
+      trackAfterAction: undefined,
+      persistence: { reducerKey: 'wrongKey' },
+    })
+    await expect(() =>
+      store.dispatch({ type: 'counter/decrement' }),
+    ).rejects.toThrow(
+      'Unexpected state structure, make sure you provided the correct reducerKey: wrongKey',
+    )
+  })
+
+  it.concurrent(
+    'should identify a reducer key that is not the correct reducer',
+    async () => {
+      const { persistedReducer } = getReducer({
+        persistence: {
+          reducerKey: 'another',
+          getStorageKey: (getState: () => unknown) => {
+            const state = getState() as HistoryState<
+              CounterState,
+              UnknownAction
+            >
+
+            return `key-${state.present.id}`
+          },
+        },
+      })
+      const store = createStore(
+        combineReducers({
+          counter: persistedReducer.reducer,
+          another: () => ({ some: 'state' }),
+        }),
+        applyMiddleware(persistedReducer.middleware),
+      )
+      await expect(() =>
+        store.dispatch({ type: 'counter/decrement' }),
+      ).rejects.toThrow(
+        'Unexpected state structure, make sure you provided the correct reducerKey: another',
+      )
+    },
+  )
+
+  it.concurrent('should handle null state', async () => {
+    const { persistedReducer } = getReducer({
+      persistence: {
+        reducerKey: 'another',
+        getStorageKey: (getState: () => unknown) => {
+          const state = getState() as HistoryState<CounterState, UnknownAction>
+
+          return `key-${state.present.id}`
+        },
+      },
+    })
+    const store = createStore(
+      () => null,
+      applyMiddleware(persistedReducer.middleware),
+    )
+    await expect(() =>
+      store.dispatch({ type: 'counter/decrement' }),
+    ).rejects.toThrow(
+      'Unexpected state structure, make sure you provided the correct reducerKey: another',
+    )
+  })
+})
+
+describe.concurrent('persistedUndoableActions with root reducer', () => {
+  it.concurrent('should work with the root reducer', async () => {
+    const { mockStorage, persistedReducer } = getReducer({
+      persistence: {
+        reducerKey: false,
+        getStorageKey: (getState: () => unknown) => {
+          const state = getState() as HistoryState<CounterState, UnknownAction>
+
+          return `key-${state.present.id}`
+        },
+      },
+    })
+    const store = createStore(
+      persistedReducer.reducer,
+      applyMiddleware(persistedReducer.middleware),
+    )
+
+    store.dispatch({ type: 'counter/start' })
+    await vi.waitFor(() => {
+      expect(mockStorage.getItem).toHaveBeenCalledExactlyOnceWith(
+        'key-counter-id',
+      )
+    })
+
+    await sleep(100)
+
+    store.dispatch({ type: 'counter/increment' })
+    await vi.waitFor(() => {
+      expect(mockStorage.setItem).toHaveBeenCalledExactlyOnceWith(
+        'key-counter-id',
+        expect.any(String),
+      )
+    })
+
+    store.dispatch({ type: 'counter/increment' })
+    await vi.waitFor(() => {
+      expect(mockStorage.setItem).toHaveBeenCalledExactlyOnceWith(
+        'key-counter-id',
+        expect.any(String),
+      )
+    })
+
+    expect(store.getState().present.count).toEqual(2)
+    expect(store.getState()[HISTORY_KEY]).toEqual({
+      tracking: true,
+      actions: [
+        { action: { type: 'counter/increment' }, undone: false },
+        { action: { type: 'counter/increment' }, undone: false },
+      ],
+      snapshot: { id: 'counter-id', count: 0 },
+    })
+
+    store.dispatch(ActionCreators.undo())
+
+    expect(store.getState().present.count).toEqual(1)
+    expect(store.getState()[HISTORY_KEY]).toEqual({
+      tracking: true,
+      actions: [
+        { action: { type: 'counter/increment' }, undone: false },
+        { action: { type: 'counter/increment' }, undone: true },
+      ],
+      snapshot: { id: 'counter-id', count: 0 },
+    })
+  })
+})
+
+function getReducer(
   config?: PartialUndoableActionsConfig & {
     persistence?: Partial<Persistence>
   },
@@ -432,6 +553,7 @@ function getStore(
     setItem: vi.fn().mockResolvedValue(undefined),
     removeItem: vi.fn().mockResolvedValue(undefined),
   }
+
   const persistedReducer = persistedUndoableActions(counterReducer, {
     trackedActions: ['counter/increment', 'counter/decrement'],
     trackAfterAction: 'counter/start',
@@ -454,17 +576,26 @@ function getStore(
       ...config?.persistence,
     },
   })
+  return { mockStorage, persistedReducer }
+}
+
+function getStore(
+  config?: PartialUndoableActionsConfig & {
+    persistence?: Partial<Persistence>
+  },
+) {
+  const { mockStorage, persistedReducer } = getReducer(config)
 
   const store = createStore(
-    combineReducers({ counter: persistedReducer.reducer }), // todo: accept root reducer as well
+    combineReducers({ counter: persistedReducer.reducer }),
     applyMiddleware(persistedReducer.middleware),
   )
 
   return { store, mockStorage }
 }
 
-function sleep(milliseconds: number) {
+function sleep(delay: number) {
   return new Promise((resolve) => {
-    setTimeout(resolve, milliseconds)
+    setTimeout(resolve, delay)
   })
 }

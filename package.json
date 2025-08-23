@@ -1,7 +1,7 @@
 {
   "name": "@ravanscafi/redux-undo-actions",
   "version": "0.0.0",
-  "description": "A different undo/redo approach for Redux, tracking actions instead of state.",
+  "description": "Batteries-included undo/redo for Redux by tracking dispatched actions, enabling event-sourcing and replay capabilities.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/ravanscafi/redux-undo-actions#readme",
@@ -13,6 +13,14 @@
     "url": "git+https://github.com/ravanscafi/redux-undo-actions.git"
   },
   "author": "Ravan Scafi <rscafi@gmail.com>",
+  "keywords": [
+    "redux",
+    "undo",
+    "event-sourcing",
+    "replay",
+    "reducer",
+    "persistence"
+  ],
   "files": [
     "dist"
   ],

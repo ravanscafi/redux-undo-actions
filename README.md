@@ -1,6 +1,6 @@
 # redux-undo-actions
 
-A different undo/redo approach for Redux, tracking actions instead of state.
+Batteries-included undo/redo for Redux by tracking dispatched actions, enabling event-sourcing and replay capabilities.
 
 ## Documentation
 

@@ -82,10 +82,12 @@ function undo<State, Action extends UnknownAction>(
     (a) => !a.undone && isActionUndoable(config, a.action),
   )
 
-  const newActions = actions.toSpliced(lastUndoableIndex, 1, {
-    ...actions[lastUndoableIndex],
-    undone: true,
-  })
+  const undoneAction = getUndoneAction(
+    config,
+    state,
+    actions[lastUndoableIndex],
+  )
+  const newActions = actions.toSpliced(lastUndoableIndex, 1, undoneAction)
 
   const present = replay(reducer, newActions, history.snapshot)
 
@@ -105,7 +107,6 @@ function redo<State, Action extends UnknownAction>(
   config: UndoableActionsConfig,
   state: HistoryState<State, Action>,
 ): HistoryState<State, Action> {
-  const { present } = state
   const history = state[HISTORY_KEY]
   const { actions } = history
 
@@ -114,21 +115,14 @@ function redo<State, Action extends UnknownAction>(
   }
 
   const firstUndoableIndex = actions.findIndex(
-    (a) => a.undone && isActionUndoable(config, a.action),
+    (a) =>
+      a.original !== undefined ||
+      (a.undone && isActionUndoable(config, a.action)),
   )
 
-  const newActions = actions.toSpliced(firstUndoableIndex, 1, {
-    ...actions[firstUndoableIndex],
-    undone: false,
-  })
-
-  let newPresent: State
-
-  if (firstUndoableIndex === actions.length - 1) {
-    newPresent = reducer(present, newActions[firstUndoableIndex].action)
-  } else {
-    newPresent = replay(reducer, newActions, history.snapshot)
-  }
+  const redoneAction = getRedoneAction(actions[firstUndoableIndex])
+  const newActions = actions.toSpliced(firstUndoableIndex, 1, redoneAction)
+  const newPresent = replay(reducer, newActions, history.snapshot)
 
   return {
     [HISTORY_KEY]: { ...history, actions: newActions },
@@ -204,7 +198,13 @@ function handleAction<State, Action extends UnknownAction>(
   let newActions = [...actions, { action, undone: false }]
   if (isActionUndoable(config, action)) {
     // clean future actions
-    newActions = newActions.filter((a) => !a.undone)
+    newActions = newActions
+      .filter((a) => !a.undone)
+      .map((a) => {
+        const cleanedAction = { ...a }
+        delete cleanedAction.original
+        return cleanedAction
+      })
   }
 
   return {
@@ -217,6 +217,7 @@ function handleAction<State, Action extends UnknownAction>(
     canRedo: canRedo(config, newActions),
   }
 }
+
 function hydrate<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   config: UndoableActionsConfig,
@@ -261,7 +262,6 @@ function setTracking<State, Action extends UnknownAction>(
     },
   }
 }
-
 function replay<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   newActions: HistoryAction<Action>[],
@@ -270,4 +270,65 @@ function replay<State, Action extends UnknownAction>(
   return newActions
     .filter((a) => !a.undone)
     .reduce((accState, a) => reducer(accState, a.action), initialState)
+}
+
+function getUndoneAction<State, Action extends UnknownAction>(
+  config: UndoableActionsConfig,
+  state: HistoryState<State, Action>,
+  action: HistoryAction<Action>,
+): HistoryAction<Action> {
+  if (action.original !== undefined) {
+    const undoneAction = {
+      ...action,
+      action: { ...action.original },
+      undone: true,
+    }
+    delete undoneAction.original
+    return undoneAction
+  }
+
+  const undoable = config.undoableActions.find(
+    (undoable) =>
+      (typeof undoable === 'string' ? undoable : undoable.type) ===
+      action.action.type,
+  )
+
+  if (typeof undoable === 'string' || typeof undoable === 'undefined') {
+    return {
+      ...action,
+      undone: true,
+    }
+  }
+
+  return {
+    ...action,
+    action: {
+      ...action.action,
+      type: undoable.replaceBy,
+      payload: undoable.transformPayload(action.action.payload, state),
+    },
+    undone: false,
+    original: { ...action.action },
+  }
+}
+
+function getRedoneAction<Action extends UnknownAction>(
+  action: HistoryAction<Action>,
+): HistoryAction<Action> {
+  if (action.original !== undefined) {
+    const redoneAction = {
+      ...action,
+      action: {
+        ...action.original,
+      },
+      undone: false,
+    }
+    delete redoneAction.original
+    return redoneAction
+  }
+
+  return {
+    ...action,
+    undone: false,
+  }
 }

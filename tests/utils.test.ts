@@ -6,14 +6,22 @@ import {
   isActionTracked,
   isActionUndoable,
 } from '../src/utils'
+import type { UndoableActionsConfig } from '../src'
 
 describe.concurrent('canUndo', () => {
-  const config = {
-    undoableActions: ['file/add', 'file/remove'],
+  const config: Pick<UndoableActionsConfig, 'undoableActions'> = {
+    undoableActions: [
+      {
+        type: 'file/add',
+        replaceBy: 'file/softDelete',
+        transformPayload: (payload: string): string => payload,
+      },
+      'file/delete',
+    ],
   }
   const actions = [
     { action: { type: 'file/add' }, undone: false },
-    { action: { type: 'file/remove' }, undone: false },
+    { action: { type: 'file/delete' }, undone: false },
     { action: { type: 'file/update' }, undone: false },
   ]
 
@@ -32,10 +40,10 @@ describe.concurrent('canUndo', () => {
 })
 
 describe.concurrent('canRedo', () => {
-  const config = { undoableActions: ['file/add', 'file/remove'] }
+  const config = { undoableActions: ['file/add', 'file/delete'] }
   const actions = [
     { action: { type: 'file/add' }, undone: false },
-    { action: { type: 'file/remove' }, undone: true },
+    { action: { type: 'file/delete' }, undone: true },
   ]
 
   it.concurrent('returns true if any action is undone', () => {
@@ -49,7 +57,16 @@ describe.concurrent('canRedo', () => {
 })
 
 describe.concurrent('isActionUndoable', () => {
-  const config = { undoableActions: ['file/add', 'file/remove'] }
+  const config: Pick<UndoableActionsConfig, 'undoableActions'> = {
+    undoableActions: [
+      {
+        type: 'file/add',
+        replaceBy: 'file/softDelete',
+        transformPayload: (payload: string): string => payload,
+      },
+      'file/delete',
+    ],
+  }
 
   it.concurrent('returns true for undoable action', () => {
     expect(isActionUndoable(config, { type: 'file/add' })).toBe(true)
@@ -67,7 +84,9 @@ describe.concurrent('isActionUndoable', () => {
 })
 
 describe.concurrent('isActionTracked', () => {
-  const config = { trackedActions: ['file/add', 'file/remove'] }
+  const config: Pick<UndoableActionsConfig, 'trackedActions'> = {
+    trackedActions: ['file/add', 'file/delete'],
+  }
 
   it.concurrent('returns true for tracked action', () => {
     expect(isActionTracked(config, { type: 'file/add' })).toBe(true)

@@ -7,33 +7,24 @@ export function canUndo<State, Action extends UnknownAction>(
 ): boolean {
   actions = actions.filter((a: HistoryAction<Action>) => !a.undone)
 
-  if (actions.length === 0) {
-    return false
-  }
-
-  return (
-    config.undoableActions.length === 0 ||
-    actions.some((a: HistoryAction<Action>) =>
-      config.undoableActions.includes(a.action.type),
-    )
-  )
+  return isUndoable(config, actions)
 }
 
 export function canRedo<State, Action extends UnknownAction>(
   _: Pick<UndoableActionsConfig, 'undoableActions'>,
   actions: History<State, Action>['actions'],
 ): boolean {
-  return actions.some((action: HistoryAction<Action>) => action.undone)
+  return actions.some(
+    (action: HistoryAction<Action>) =>
+      action.undone || action.original !== undefined,
+  )
 }
 
 export function isActionUndoable(
   config: Pick<UndoableActionsConfig, 'undoableActions'>,
   action: UnknownAction,
 ): boolean {
-  return (
-    config.undoableActions.length === 0 ||
-    config.undoableActions.includes(action.type)
-  )
+  return isUndoable(config, [{ action, undone: false }])
 }
 
 export function isActionTracked(
@@ -80,4 +71,25 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   }
 
   return false
+}
+
+function isUndoable<Action extends UnknownAction>(
+  config: Pick<UndoableActionsConfig, 'undoableActions'>,
+  actions: HistoryAction<Action>[],
+) {
+  if (actions.length === 0) {
+    return false
+  }
+
+  if (config.undoableActions.length === 0) {
+    return true
+  }
+
+  return config.undoableActions.some((undoable) =>
+    actions.some(({ action }) =>
+      typeof undoable === 'string'
+        ? undoable === action.type
+        : undoable.type === action.type,
+    ),
+  )
 }

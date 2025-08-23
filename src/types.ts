@@ -14,6 +14,12 @@ export interface HistoryAction<Action extends UnknownAction> {
    * Indicates whether this action was undone during history tracking.
    */
   undone: boolean
+  /**
+   * If the original action was replaced when undone,
+   * this field holds the original action.
+   * When replaced, an action will have the `undone` flag set to false.
+   */
+  original?: Action
 }
 
 /**
@@ -187,7 +193,7 @@ export interface UndoableActionsConfig {
    * @example ['canvas/draw']
    * @default []
    */
-  undoableActions: UnknownAction['type'][]
+  undoableActions: UndoableAction[]
   /**
    * Action type that triggers the start of history tracking.
    * Useful if your actual initial state loads asynchronously.
@@ -238,6 +244,20 @@ export interface UndoableActionsConfig {
     tracking: UnknownAction['type']
   }
 }
+
+/**
+ * An undoable action can be a simple action type or an object with a `replace` property.
+ * The `replace` property allows specifying an alternative action type to be used
+ * when the action is undone.
+ */
+export type UndoableAction =
+  | UnknownAction['type']
+  | {
+      type: UnknownAction['type']
+      replaceBy: UnknownAction['type']
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- allow users to customize the signature
+      transformPayload: (payload: any, state: any) => any
+    }
 
 /**
  * Configuration for undoable actions with persistence.

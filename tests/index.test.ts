@@ -12,9 +12,9 @@ import {
 import { HISTORY_KEY } from '../src/actions'
 
 const counterReducer = (
-  state = { name: 'Counter', count: 0 },
+  state = { name: 'Counter', suggestedName: '', count: 0 },
   action: UnknownAction,
-): { name: string; count: number } => {
+): { name: string; suggestedName: string; count: number } => {
   switch (action.type) {
     case 'counter/increment':
       return {
@@ -30,6 +30,8 @@ const counterReducer = (
       return { ...state, count: action.payload as number }
     case 'counter/changeName':
       return { ...state, name: action.payload as string }
+    case 'counter/suggestName':
+      return { ...state, suggestedName: action.payload as string }
     default:
       return state
   }
@@ -470,3 +472,323 @@ describe.concurrent('undoableActions with custom config', () => {
     expect(store.getState().canRedo).toStrictEqual(true)
   })
 })
+
+describe.concurrent(
+  'undoableActions with replaceable actions that are also undoable',
+  () => {
+    it.concurrent('should only track actions when the state changes', () => {
+      const store = createStore(
+        undoableActions(counterReducer, {
+          undoableActions: [
+            {
+              type: 'counter/changeName',
+              replaceBy: 'counter/suggestName',
+              transformPayload: (payload: string): string => payload,
+            },
+            'counter/suggestName',
+          ],
+          internalActions: {
+            undo: 'counter/undo',
+            redo: 'counter/redo',
+          },
+        }),
+      )
+
+      expectCount(store, 0)
+      expectHistoryActions(store, [])
+      expect(store.getState().canUndo).toStrictEqual(false)
+      expect(store.getState().canRedo).toStrictEqual(false)
+
+      store.dispatch({ type: 'counter/increment' })
+      expectCount(store, 1)
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(false)
+      expect(store.getState().canRedo).toStrictEqual(false)
+
+      store.dispatch({
+        type: 'counter/changeName',
+        payload: 'New Counter Name',
+      })
+      expect(store.getState().present.name).toStrictEqual('New Counter Name')
+      expect(store.getState().present.suggestedName).toStrictEqual('')
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: { type: 'counter/changeName', payload: 'New Counter Name' },
+          undone: false,
+        },
+      ])
+
+      store.dispatch({ type: 'counter/undo' })
+      expectCount(store, 1)
+      expect(store.getState().present.name).toStrictEqual('Counter')
+      expect(store.getState().present.suggestedName).toStrictEqual(
+        'New Counter Name',
+      )
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: { type: 'counter/suggestName', payload: 'New Counter Name' },
+          undone: false,
+          original: { type: 'counter/changeName', payload: 'New Counter Name' },
+        },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(true)
+      expect(store.getState().canRedo).toStrictEqual(true)
+
+      store.dispatch({ type: 'counter/undo' })
+      expectCount(store, 1)
+      expect(store.getState().present.name).toStrictEqual('Counter')
+      expect(store.getState().present.suggestedName).toStrictEqual('')
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: { type: 'counter/changeName', payload: 'New Counter Name' },
+          undone: true,
+        },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(false)
+      expect(store.getState().canRedo).toStrictEqual(true)
+
+      store.dispatch({ type: 'counter/redo' })
+      expectCount(store, 1)
+      expect(store.getState().present.name).toStrictEqual('New Counter Name')
+      expect(store.getState().present.suggestedName).toStrictEqual('')
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: { type: 'counter/changeName', payload: 'New Counter Name' },
+          undone: false,
+        },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(true)
+      expect(store.getState().canRedo).toStrictEqual(false)
+
+      store.dispatch({ type: 'counter/undo' })
+      expectCount(store, 1)
+      expect(store.getState().present.name).toStrictEqual('Counter')
+      expect(store.getState().present.suggestedName).toStrictEqual(
+        'New Counter Name',
+      )
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: { type: 'counter/suggestName', payload: 'New Counter Name' },
+          undone: false,
+          original: { type: 'counter/changeName', payload: 'New Counter Name' },
+        },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(true)
+      expect(store.getState().canRedo).toStrictEqual(true)
+
+      store.dispatch({ type: 'counter/redo' })
+      expectCount(store, 1)
+      expect(store.getState().present.name).toStrictEqual('New Counter Name')
+      expect(store.getState().present.suggestedName).toStrictEqual('')
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: { type: 'counter/changeName', payload: 'New Counter Name' },
+          undone: false,
+        },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(true)
+      expect(store.getState().canRedo).toStrictEqual(false)
+
+      store.dispatch({ type: 'counter/undo' })
+      expectCount(store, 1)
+      expect(store.getState().present.name).toStrictEqual('Counter')
+      expect(store.getState().present.suggestedName).toStrictEqual(
+        'New Counter Name',
+      )
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: { type: 'counter/suggestName', payload: 'New Counter Name' },
+          undone: false,
+          original: { type: 'counter/changeName', payload: 'New Counter Name' },
+        },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(true)
+      expect(store.getState().canRedo).toStrictEqual(true)
+
+      store.dispatch({ type: 'counter/changeName', payload: 'Final Name' })
+      expect(store.getState().present.name).toStrictEqual('Final Name')
+      expect(store.getState().present.suggestedName).toStrictEqual(
+        'New Counter Name',
+      )
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: { type: 'counter/suggestName', payload: 'New Counter Name' },
+          undone: false,
+        },
+        {
+          action: { type: 'counter/changeName', payload: 'Final Name' },
+          undone: false,
+        },
+      ])
+    })
+  },
+)
+
+describe.concurrent(
+  'undoableActions with replaceable actions that are not undoable',
+  () => {
+    it.concurrent('should only track actions when the state changes', () => {
+      const store = createStore(
+        undoableActions(counterReducer, {
+          undoableActions: [
+            {
+              type: 'counter/changeName',
+              replaceBy: 'counter/suggestName',
+              transformPayload: (payload: string): string =>
+                payload + ' (suggested)',
+            },
+          ],
+          internalActions: {
+            undo: 'counter/undo',
+            redo: 'counter/redo',
+          },
+        }),
+      )
+
+      expectCount(store, 0)
+      expectHistoryActions(store, [])
+      expect(store.getState().canUndo).toStrictEqual(false)
+      expect(store.getState().canRedo).toStrictEqual(false)
+
+      store.dispatch({ type: 'counter/increment' })
+      expectCount(store, 1)
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(false)
+      expect(store.getState().canRedo).toStrictEqual(false)
+
+      store.dispatch({
+        type: 'counter/changeName',
+        payload: 'New Counter Name',
+      })
+      expect(store.getState().present.name).toStrictEqual('New Counter Name')
+      expect(store.getState().present.suggestedName).toStrictEqual('')
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: { type: 'counter/changeName', payload: 'New Counter Name' },
+          undone: false,
+        },
+      ])
+
+      store.dispatch({ type: 'counter/undo' })
+      expectCount(store, 1)
+      expect(store.getState().present.name).toStrictEqual('Counter')
+      expect(store.getState().present.suggestedName).toStrictEqual(
+        'New Counter Name (suggested)',
+      )
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: {
+            type: 'counter/suggestName',
+            payload: 'New Counter Name (suggested)',
+          },
+          undone: false,
+          original: { type: 'counter/changeName', payload: 'New Counter Name' },
+        },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(false)
+      expect(store.getState().canRedo).toStrictEqual(true)
+
+      store.dispatch({ type: 'counter/redo' })
+      expectCount(store, 1)
+      expect(store.getState().present.name).toStrictEqual('New Counter Name')
+      expect(store.getState().present.suggestedName).toStrictEqual('')
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: { type: 'counter/changeName', payload: 'New Counter Name' },
+          undone: false,
+        },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(true)
+      expect(store.getState().canRedo).toStrictEqual(false)
+
+      store.dispatch({ type: 'counter/undo' })
+      expectCount(store, 1)
+      expect(store.getState().present.name).toStrictEqual('Counter')
+      expect(store.getState().present.suggestedName).toStrictEqual(
+        'New Counter Name (suggested)',
+      )
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: {
+            type: 'counter/suggestName',
+            payload: 'New Counter Name (suggested)',
+          },
+          undone: false,
+          original: { type: 'counter/changeName', payload: 'New Counter Name' },
+        },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(false)
+      expect(store.getState().canRedo).toStrictEqual(true)
+
+      store.dispatch({ type: 'counter/changeName', payload: 'Change me!' })
+      expect(store.getState().canUndo).toStrictEqual(true)
+
+      store.dispatch({ type: 'counter/undo' })
+      expectCount(store, 1)
+      expect(store.getState().present.name).toStrictEqual('Counter')
+      expect(store.getState().present.suggestedName).toStrictEqual(
+        'Change me! (suggested)',
+      )
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: {
+            type: 'counter/suggestName',
+            payload: 'New Counter Name (suggested)',
+          },
+          undone: false,
+        },
+        {
+          action: {
+            type: 'counter/suggestName',
+            payload: 'Change me! (suggested)',
+          },
+          undone: false,
+          original: { type: 'counter/changeName', payload: 'Change me!' },
+        },
+      ])
+      expect(store.getState().canUndo).toStrictEqual(false)
+      expect(store.getState().canRedo).toStrictEqual(true)
+
+      store.dispatch({ type: 'counter/undo' })
+      expect(store.getState().present.name).toStrictEqual('Counter')
+      expect(store.getState().present.suggestedName).toStrictEqual(
+        'Change me! (suggested)',
+      )
+      expectHistoryActions(store, [
+        { action: { type: 'counter/increment' }, undone: false },
+        {
+          action: {
+            type: 'counter/suggestName',
+            payload: 'New Counter Name (suggested)',
+          },
+          undone: false,
+        },
+        {
+          action: {
+            type: 'counter/suggestName',
+            payload: 'Change me! (suggested)',
+          },
+          undone: false,
+          original: { type: 'counter/changeName', payload: 'Change me!' },
+        },
+      ])
+    })
+  },
+)

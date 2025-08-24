@@ -5,5 +5,6 @@ export default defineConfig({
     coverage: {
       exclude: ['*.config.ts', '*.config.mjs'],
     },
+    include: ['tests/*.test.ts'],
   },
 })

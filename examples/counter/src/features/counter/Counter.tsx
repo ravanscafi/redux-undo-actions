@@ -1,18 +1,14 @@
 import { useState } from 'react'
 
-import { useAppSelector, useAppDispatch } from '../../app/hooks'
-import {
-  decrement,
-  increment,
-  incrementByAmount,
-  incrementAsync,
-  incrementIfOdd,
-  selectCount,
-} from './counterSlice'
+import { useAppDispatch, useAppSelector } from '../../app/hooks'
+import { decrement, increment, incrementAsync, incrementByAmount, incrementIfOdd, selectCount } from './counterSlice'
 import styles from './Counter.module.css'
+import { ActionCreators } from '@ravanscafi/redux-undo-actions'
 
 export function Counter() {
   const count = useAppSelector(selectCount)
+  const canUndo = useAppSelector((state) => state.counter.canUndo)
+  const canRedo = useAppSelector((state) => state.counter.canRedo)
   const dispatch = useAppDispatch()
   const [incrementAmount, setIncrementAmount] = useState('2')
 
@@ -65,6 +61,22 @@ export function Counter() {
           }}
         >
           Add If Odd
+        </button>
+      </div>
+      <div className={styles.row}>
+        <button
+          className={styles.button}
+          disabled={!canUndo}
+          onClick={() => dispatch(ActionCreators.undo())}
+        >
+          Undo
+        </button>
+        <button
+          className={styles.button}
+          disabled={!canRedo}
+          onClick={() => dispatch(ActionCreators.redo())}
+        >
+          Redo
         </button>
       </div>
     </div>

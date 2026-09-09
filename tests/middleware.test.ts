@@ -388,6 +388,193 @@ describe.concurrent('persistedUndoableActions', () => {
   })
 })
 
+describe('persistence serialization', () => {
+  it('persists undo dispatched while a preceding write is pending', async () => {
+    const { store, mockStorage } = getStore({
+      trackedActions: [
+        'counter/increment',
+        'counter/decrement',
+        'counter/undo',
+      ],
+      internalActions: { undo: 'counter/undo' },
+    })
+    await Promise.resolve(store.dispatch({ type: 'counter/start' }))
+
+    let releaseWrite!: () => void
+    const writeBlocked = new Promise<void>((resolve) => {
+      releaseWrite = resolve
+    })
+    let markWriteStarted!: () => void
+    const writeStarted = new Promise<void>((resolve) => {
+      markWriteStarted = resolve
+    })
+    const values: string[] = []
+    let writeCount = 0
+    mockStorage.setItem.mockImplementation(
+      async (_key: string, value: string) => {
+        writeCount += 1
+        if (writeCount === 1) {
+          markWriteStarted()
+          await writeBlocked
+        }
+        values.push(value)
+      },
+    )
+
+    const increment = store.dispatch({ type: 'counter/increment' })
+    await writeStarted
+    const undo = store.dispatch({ type: 'counter/undo' })
+    releaseWrite()
+    await Promise.all([Promise.resolve(increment), Promise.resolve(undo)])
+
+    const lastPersistedValue = values.at(-1)
+    expect(lastPersistedValue).toBeDefined()
+    if (lastPersistedValue === undefined) {
+      throw new Error('Expected history to be persisted')
+    }
+    const persisted = JSON.parse(lastPersistedValue) as { actions: unknown[] }
+    expect(persisted.actions).toEqual([
+      { action: { type: 'counter/increment' }, undone: true },
+    ])
+  })
+
+  it('loads a new storage key while a preceding write is pending', async () => {
+    const { store, mockStorage } = getStore()
+    await Promise.resolve(
+      store.dispatch({
+        type: 'counter/start',
+        payload: { id: 'first', count: 0 },
+      }),
+    )
+
+    let releaseWrite!: () => void
+    const writeBlocked = new Promise<void>((resolve) => {
+      releaseWrite = resolve
+    })
+    let markWriteStarted!: () => void
+    const writeStarted = new Promise<void>((resolve) => {
+      markWriteStarted = resolve
+    })
+    mockStorage.setItem.mockImplementation(async () => {
+      markWriteStarted()
+      await writeBlocked
+    })
+    mockStorage.getItem.mockImplementation((key: string) => {
+      if (key !== 'key-second') {
+        return Promise.resolve(null)
+      }
+      return Promise.resolve(
+        JSON.stringify({
+          tracking: true,
+          actions: [{ action: { type: 'counter/decrement' }, undone: false }],
+        }),
+      )
+    })
+
+    const increment = store.dispatch({ type: 'counter/increment' })
+    await writeStarted
+    const nextSession = store.dispatch({
+      type: 'counter/start',
+      payload: { id: 'second', count: 0 },
+    })
+    releaseWrite()
+    await Promise.all([
+      Promise.resolve(increment),
+      Promise.resolve(nextSession),
+    ])
+
+    expect(mockStorage.getItem).toHaveBeenCalledWith('key-second')
+    expect(store.getState().counter.present).toEqual({
+      id: 'second',
+      count: -1,
+    })
+  })
+
+  it('removes history when reset follows a pending write', async () => {
+    const { store, mockStorage } = getStore({
+      internalActions: { reset: 'counter/reset' },
+    })
+    await Promise.resolve(store.dispatch({ type: 'counter/start' }))
+
+    let releaseWrite!: () => void
+    const writeBlocked = new Promise<void>((resolve) => {
+      releaseWrite = resolve
+    })
+    let markWriteStarted!: () => void
+    const writeStarted = new Promise<void>((resolve) => {
+      markWriteStarted = resolve
+    })
+    mockStorage.setItem.mockImplementation(async () => {
+      markWriteStarted()
+      await writeBlocked
+    })
+
+    const increment = store.dispatch({ type: 'counter/increment' })
+    await writeStarted
+    const reset = store.dispatch({ type: 'counter/reset' })
+    releaseWrite()
+    await Promise.all([Promise.resolve(increment), Promise.resolve(reset)])
+
+    expect(mockStorage.removeItem).toHaveBeenCalledExactlyOnceWith(
+      'key-counter-id',
+    )
+  })
+
+  it('does not hydrate history after its storage key becomes stale', async () => {
+    const { store, mockStorage } = getStore()
+    let releaseFirstLoad!: () => void
+    const firstLoadBlocked = new Promise<void>((resolve) => {
+      releaseFirstLoad = resolve
+    })
+    let markFirstLoadStarted!: () => void
+    const firstLoadStarted = new Promise<void>((resolve) => {
+      markFirstLoadStarted = resolve
+    })
+    mockStorage.getItem.mockImplementation(async (key: string) => {
+      if (key === 'key-first') {
+        markFirstLoadStarted()
+        await firstLoadBlocked
+        return JSON.stringify({
+          tracking: true,
+          actions: [
+            {
+              action: { type: 'counter/increment', payload: 10 },
+              undone: false,
+            },
+          ],
+        })
+      }
+      if (key === 'key-second') {
+        return JSON.stringify({
+          tracking: true,
+          actions: [{ action: { type: 'counter/decrement' }, undone: false }],
+        })
+      }
+      return null
+    })
+
+    const firstSession = store.dispatch({
+      type: 'counter/start',
+      payload: { id: 'first', count: 0 },
+    })
+    await firstLoadStarted
+    const secondSession = store.dispatch({
+      type: 'counter/start',
+      payload: { id: 'second', count: 0 },
+    })
+    releaseFirstLoad()
+    await Promise.all([
+      Promise.resolve(firstSession),
+      Promise.resolve(secondSession),
+    ])
+
+    expect(store.getState().counter.present).toEqual({
+      id: 'second',
+      count: -1,
+    })
+  })
+})
+
 describe.concurrent('configuration validation', () => {
   it.concurrent('should identify a non-existing reducer key', async () => {
     const { store } = getStore({
@@ -542,6 +729,10 @@ function getReducer(
           count: state.count - ((action.payload as number) || 1),
         }
       case 'counter/start':
+        if (typeof action.payload === 'object' && action.payload !== null) {
+          const payload = action.payload as Partial<CounterState>
+          return { ...state, ...payload }
+        }
         return { ...state, count: (action.payload as number) || 0 }
       default:
         return state
@@ -549,7 +740,7 @@ function getReducer(
   }
 
   const mockStorage = {
-    getItem: vi.fn().mockResolvedValue(undefined),
+    getItem: vi.fn().mockResolvedValue(null),
     setItem: vi.fn().mockResolvedValue(undefined),
     removeItem: vi.fn().mockResolvedValue(undefined),
   }

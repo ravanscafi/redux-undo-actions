@@ -210,6 +210,11 @@ history using getStorageKey; if found, it dispatches hydrate with the saved
 data, then optionally dispatchAfterMaybeLoading.
 If trackAfterAction is not set, loading happens immediately on init.
 
+Storage operations are processed in dispatch order within each middleware
+instance. Pending writes do not cause later saves, resets, or loads to be
+dropped. If the storage key changes while history is loading, that stale
+history is ignored instead of being applied to the new state.
+
 Example: conditional persistence per entity/document
 
 ```typescript

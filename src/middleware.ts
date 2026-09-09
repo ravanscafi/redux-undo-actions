@@ -10,7 +10,24 @@ export default function createPersistenceMiddleware(
   const { reducerKey, getStorageKey, storage, dispatchAfterMaybeLoading } =
     config.persistence
   const isTracked = (action: UnknownAction) => isActionTracked(config, action)
-  let canUseStorage = true
+  let storageQueue: Promise<void> | undefined
+
+  const schedule = (operation: () => Promise<void>) => {
+    const result = storageQueue
+      ? storageQueue.then(operation, operation)
+      : operation()
+    const settledResult = result.then(
+      () => undefined,
+      () => undefined,
+    )
+    storageQueue = settledResult
+    void settledResult.then(() => {
+      if (storageQueue === settledResult) {
+        storageQueue = undefined
+      }
+    })
+    return result
+  }
 
   return (storeAPI) => (next) => async (action) => {
     if (!isAction(action)) {
@@ -23,46 +40,46 @@ export default function createPersistenceMiddleware(
     // after grabbing the previous state, we can call next
     const returnValue = next(action)
 
-    if (canUseStorage && action.type === config.internalActions.reset) {
-      canUseStorage = false
-      await removeHistory(
-        storage,
-        getStorageKey(() => previousState),
-      )
-      canUseStorage = true
+    if (action.type === config.internalActions.reset) {
+      const storageKey = getStorageKey(() => previousState)
+      await schedule(() => removeHistory(storage, storageKey))
 
       // no need to continue
       return returnValue
     }
 
-    if (canUseStorage && action.type === config.trackAfterAction) {
-      canUseStorage = false
-      const history = await loadHistory(
-        storage,
-        getStorageKey(() => storeAPI.getState()),
-      )
-      if (history !== undefined) {
-        storeAPI.dispatch({
-          type: config.internalActions.hydrate,
-          payload: history,
-        })
-      }
+    if (action.type === config.trackAfterAction) {
+      const storageKey = getStorageKey(() => storeAPI.getState())
+      await schedule(async () => {
+        const history = await loadHistory(storage, storageKey)
+        const isCurrent =
+          getStorageKey(() => storeAPI.getState()) === storageKey
+        if (!isCurrent) {
+          return
+        }
 
-      if (dispatchAfterMaybeLoading) {
-        // experimental timeout to allow visual changes to be applied after hydration
-        setTimeout(
-          () => storeAPI.dispatch({ type: dispatchAfterMaybeLoading }),
-          100,
-        )
-      }
+        if (history !== undefined) {
+          storeAPI.dispatch({
+            type: config.internalActions.hydrate,
+            payload: history,
+          })
+        }
 
-      canUseStorage = true
+        if (dispatchAfterMaybeLoading) {
+          // experimental timeout to allow visual changes to be applied after hydration
+          setTimeout(() => {
+            if (getStorageKey(() => storeAPI.getState()) === storageKey) {
+              storeAPI.dispatch({ type: dispatchAfterMaybeLoading })
+            }
+          }, 100)
+        }
+      })
 
       // halt from saving for no reason
       return returnValue
     }
 
-    if (!isTracked(action) || !canUseStorage) {
+    if (!isTracked(action)) {
       return returnValue
     }
 
@@ -76,15 +93,12 @@ export default function createPersistenceMiddleware(
       (currentHistory.actions.length > 0 &&
         currentHistory.actions !== previousHistory.actions)
     ) {
-      canUseStorage = false
-
-      const storageKey = getStorageKey(() => storeAPI.getState())
+      const storageKey = getStorageKey(() => currentState)
       const history = {
         actions: currentHistory.actions,
         tracking: currentHistory.tracking,
       }
-      await saveHistory(storage, storageKey, history)
-      canUseStorage = true
+      await schedule(() => saveHistory(storage, storageKey, history))
     }
 
     return returnValue

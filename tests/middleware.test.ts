@@ -359,6 +359,10 @@ describe.concurrent('persistedUndoableActions', () => {
       expect(store.getState().counter[HISTORY_KEY].actions).toStrictEqual(
         exportedHistory.actions,
       )
+      const actions = store.getState().counter[HISTORY_KEY].actions
+      expect(Object.isFrozen(actions)).toBe(true)
+      expect(actions.every((entry) => Object.isFrozen(entry))).toBe(true)
+      expect(actions.every((entry) => Object.isFrozen(entry.action))).toBe(true)
       expect(store.getState().counter.canUndo).toStrictEqual(true)
       expect(store.getState().counter.canRedo).toStrictEqual(true)
     })

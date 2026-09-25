@@ -1,12 +1,13 @@
 import type {
   PartialUndoableActionsConfig,
-  PersistedUndoableActionsConfig,
   Persistence,
-  UndoableActionsConfig,
+  ResolvedPersistedUndoableActionsConfig,
+  ResolvedUndoableActionsConfig,
 } from './types'
 import { ActionTypes } from './actions'
 
-const initialUndoableActionsConfig: UndoableActionsConfig = {
+const initialUndoableActionsConfig: ResolvedUndoableActionsConfig = {
+  immutableHistory: true,
   trackedActions: [],
   undoableActions: [],
   trackAfterAction: undefined,
@@ -21,10 +22,13 @@ const initialUndoableActionsConfig: UndoableActionsConfig = {
 
 export function getConfig(
   customConfig?: PartialUndoableActionsConfig,
-): UndoableActionsConfig {
+): ResolvedUndoableActionsConfig {
   return {
     ...initialUndoableActionsConfig,
     ...customConfig,
+    immutableHistory:
+      customConfig?.immutableHistory ??
+      initialUndoableActionsConfig.immutableHistory,
     internalActions: {
       ...initialUndoableActionsConfig.internalActions,
       ...customConfig?.internalActions,
@@ -34,10 +38,13 @@ export function getConfig(
 
 export function getConfigWithPersistence(
   customConfig: PartialUndoableActionsConfig & { persistence: Persistence },
-): PersistedUndoableActionsConfig {
+): ResolvedPersistedUndoableActionsConfig {
   return {
     ...initialUndoableActionsConfig,
     ...customConfig,
+    immutableHistory:
+      customConfig.immutableHistory ??
+      initialUndoableActionsConfig.immutableHistory,
     internalActions: {
       ...initialUndoableActionsConfig.internalActions,
       ...customConfig.internalActions,

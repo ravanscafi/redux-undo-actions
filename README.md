@@ -24,6 +24,27 @@ event-sourcing and replay capabilities.
 npm install @ravanscafi/redux-undo-actions
 ```
 
+## Breaking changes in 0.1
+
+Version 0.1 deliberately changes captured history to be immutable by default.
+Tracked actions, hydrated histories, and preloaded Redux history state are
+copied into library-owned data and deeply frozen. The public history types are
+readonly, and reference identity with the object passed to `dispatch` is no
+longer preserved.
+
+With the default `immutableHistory: true`, tracked actions must contain only
+primitives, arrays, and plain objects with data properties. Class instances
+(including `Date`, `Map`, and `Set`), functions, and accessor properties are
+rejected with a path to the unsupported value. Migrate those values to plain
+data when possible, or set `immutableHistory: false` as a compatibility escape
+hatch. The escape hatch gives up mutation protection and the Redux Toolkit
+immutable-middleware performance improvement.
+
+Persistence still uses JSON. Cycles, `bigint`, symbol-valued properties, and
+other values unsupported by `JSON.stringify` must not be used in persisted
+histories, even though non-persisted immutable history can preserve cycles,
+shared references, and symbol-keyed data.
+
 ## Quick Start
 
 ```typescript
@@ -138,6 +159,11 @@ Each wrapped reducer exposes the following shape:
 - trackedActions: string[]
   - Which Redux action types to track in history.
   - Default: [] (track all actions)
+- immutableHistory: boolean
+  - Copies tracked actions into library-owned deeply frozen plain data.
+  - Default: true.
+  - Set to false only for compatibility with non-plain action payloads; this
+    gives up mutation protection and immutable-middleware optimization.
 - undoableActions: string[]
   - Which tracked actions are undoable/redone.
   - Default: [] (all tracked actions are undoable)
@@ -278,6 +304,13 @@ const selectCanRedo = (s: RootState) => {
 - Action-based history
   - The library stores a list of actions with an undone flag, not
     past/present/future state snapshots.
+  - Tracked actions are copied into library-owned plain data and deeply frozen.
+    Mutating the object originally passed to `dispatch` cannot change later
+    replay behavior, and immutable-state middleware can skip the frozen action
+    list efficiently.
+  - History actions support primitives, arrays, and plain objects. Class
+    instances, functions, and accessor properties are rejected because they
+    cannot be captured as deterministic immutable replay data.
   - present is always computed by your reducer; on undo/redo, we either replay
     from snapshot or apply a minimal step when possible.
 - Undo/Redo semantics

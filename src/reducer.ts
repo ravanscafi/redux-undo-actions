@@ -4,7 +4,7 @@ import type {
   History,
   HistoryAction,
   HistoryState,
-  UndoableActionsConfig,
+  ResolvedUndoableActionsConfig,
 } from './types'
 import {
   canRedo,
@@ -14,10 +14,17 @@ import {
   isActionUndoable,
 } from './utils'
 import { HISTORY_KEY } from './actions'
+import {
+  captureHistoryAction,
+  captureHistoryActions,
+  freezeHistoryActions,
+  isCapturedHistoryActions,
+  setHistoryActionUndone,
+} from './immutable'
 
 export default function createReducer<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
-  config: UndoableActionsConfig,
+  config: ResolvedUndoableActionsConfig,
 ): Reducer<HistoryState<State, Action>, Action> {
   const initialState = getInitialState(reducer, config)
 
@@ -29,28 +36,54 @@ export default function createReducer<State, Action extends UnknownAction>(
       return initialState
     }
 
+    const normalizedState = normalizeHistoryState(state, config)
+
     switch (action.type) {
       case config.internalActions.undo:
-        return undo(reducer, config, state)
+        return undo(reducer, config, normalizedState)
       case config.internalActions.redo:
-        return redo(reducer, config, state)
+        return redo(reducer, config, normalizedState)
       case config.internalActions.reset:
-        return reset(config, state, initialState)
+        return reset(config, normalizedState, initialState)
       case config.internalActions.hydrate:
-        return hydrate(reducer, config, state, action, initialState)
+        return hydrate(reducer, config, normalizedState, action, initialState)
       case config.internalActions.tracking:
-        return setTracking(state, action)
+        return setTracking(normalizedState, action)
       case config.trackAfterAction:
-        return trackAfter(reducer, config, state, action, initialState)
+        return trackAfter(
+          reducer,
+          config,
+          normalizedState,
+          action,
+          initialState,
+        )
       default:
-        return handleAction(reducer, config, state, action)
+        return handleAction(reducer, config, normalizedState, action)
     }
+  }
+}
+
+function normalizeHistoryState<State, Action extends UnknownAction>(
+  state: HistoryState<State, Action>,
+  config: ResolvedUndoableActionsConfig,
+): HistoryState<State, Action> {
+  const history = state[HISTORY_KEY]
+  if (!config.immutableHistory || isCapturedHistoryActions(history.actions)) {
+    return state
+  }
+
+  return {
+    ...state,
+    [HISTORY_KEY]: {
+      ...history,
+      actions: captureHistoryActions(history.actions, true),
+    },
   }
 }
 
 function getInitialState<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
-  config: UndoableActionsConfig,
+  config: ResolvedUndoableActionsConfig,
 ): HistoryState<State, Action> {
   const initialPresent = reducer(undefined, {} as Action)
 
@@ -58,7 +91,7 @@ function getInitialState<State, Action extends UnknownAction>(
     present: initialPresent,
     [HISTORY_KEY]: {
       tracking: config.trackAfterAction === undefined,
-      actions: [],
+      actions: freezeHistoryActions([], config.immutableHistory),
       snapshot: initialPresent,
     },
     canUndo: false,
@@ -68,7 +101,7 @@ function getInitialState<State, Action extends UnknownAction>(
 
 function undo<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
-  config: UndoableActionsConfig,
+  config: ResolvedUndoableActionsConfig,
   state: HistoryState<State, Action>,
 ): HistoryState<State, Action> {
   const history = state[HISTORY_KEY]
@@ -82,10 +115,18 @@ function undo<State, Action extends UnknownAction>(
     (a) => !a.undone && isActionUndoable(config, a.action),
   )
 
-  const newActions = actions.toSpliced(lastUndoableIndex, 1, {
-    ...actions[lastUndoableIndex],
-    undone: true,
-  })
+  const newActions = freezeHistoryActions(
+    actions.toSpliced(
+      lastUndoableIndex,
+      1,
+      setHistoryActionUndone(
+        actions[lastUndoableIndex],
+        true,
+        config.immutableHistory,
+      ),
+    ),
+    config.immutableHistory,
+  )
 
   const present = replay(reducer, newActions, history.snapshot)
 
@@ -102,7 +143,7 @@ function undo<State, Action extends UnknownAction>(
 
 function redo<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
-  config: UndoableActionsConfig,
+  config: ResolvedUndoableActionsConfig,
   state: HistoryState<State, Action>,
 ): HistoryState<State, Action> {
   const { present } = state
@@ -117,10 +158,18 @@ function redo<State, Action extends UnknownAction>(
     (a) => a.undone && isActionUndoable(config, a.action),
   )
 
-  const newActions = actions.toSpliced(firstUndoableIndex, 1, {
-    ...actions[firstUndoableIndex],
-    undone: false,
-  })
+  const newActions = freezeHistoryActions(
+    actions.toSpliced(
+      firstUndoableIndex,
+      1,
+      setHistoryActionUndone(
+        actions[firstUndoableIndex],
+        false,
+        config.immutableHistory,
+      ),
+    ),
+    config.immutableHistory,
+  )
 
   let newPresent: State
 
@@ -139,7 +188,7 @@ function redo<State, Action extends UnknownAction>(
 }
 
 function reset<State, Action extends UnknownAction>(
-  config: UndoableActionsConfig,
+  config: ResolvedUndoableActionsConfig,
   state: HistoryState<State, Action>,
   initialState: HistoryState<State, Action>,
 ): HistoryState<State, Action> {
@@ -160,7 +209,7 @@ function reset<State, Action extends UnknownAction>(
 
 function trackAfter<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
-  config: UndoableActionsConfig,
+  config: ResolvedUndoableActionsConfig,
   state: HistoryState<State, Action>,
   action: Action,
   initialState: HistoryState<State, Action>,
@@ -180,7 +229,7 @@ function trackAfter<State, Action extends UnknownAction>(
 
 function handleAction<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
-  config: UndoableActionsConfig,
+  config: ResolvedUndoableActionsConfig,
   state: HistoryState<State, Action>,
   action: Action,
 ): HistoryState<State, Action> {
@@ -201,11 +250,16 @@ function handleAction<State, Action extends UnknownAction>(
     }
   }
 
-  let newActions = [...actions, { action, undone: false }]
-  if (isActionUndoable(config, action)) {
-    // clean future actions
-    newActions = newActions.filter((a) => !a.undone)
-  }
+  const retainedActions = isActionUndoable(config, action)
+    ? actions.filter((historyAction) => !historyAction.undone)
+    : actions
+  const newActions = freezeHistoryActions(
+    [
+      ...retainedActions,
+      captureHistoryAction(action, false, config.immutableHistory),
+    ],
+    config.immutableHistory,
+  )
 
   return {
     [HISTORY_KEY]: {
@@ -219,7 +273,7 @@ function handleAction<State, Action extends UnknownAction>(
 }
 function hydrate<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
-  config: UndoableActionsConfig,
+  config: ResolvedUndoableActionsConfig,
   state: HistoryState<State, Action>,
   action: Action,
   initialState: HistoryState<State, Action>,
@@ -229,20 +283,24 @@ function hydrate<State, Action extends UnknownAction>(
     State,
     Action
   >
+  const capturedActions = captureHistoryActions(
+    actions,
+    config.immutableHistory,
+  )
 
-  const newPresent = replay(reducer, actions, state.present)
+  const newPresent = replay(reducer, capturedActions, state.present)
 
   return {
     ...initialState,
     [HISTORY_KEY]: {
       ...initialState[HISTORY_KEY],
       tracking,
-      actions,
+      actions: capturedActions,
       snapshot: state.present,
     },
     present: newPresent,
-    canUndo: canUndo(config, actions),
-    canRedo: canRedo(config, actions),
+    canUndo: canUndo(config, capturedActions),
+    canRedo: canRedo(config, capturedActions),
   }
 }
 
@@ -264,7 +322,7 @@ function setTracking<State, Action extends UnknownAction>(
 
 function replay<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
-  newActions: HistoryAction<Action>[],
+  newActions: readonly HistoryAction<Action>[],
   initialState: State,
 ): State {
   return newActions

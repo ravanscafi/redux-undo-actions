@@ -24,6 +24,26 @@ event-sourcing and replay capabilities.
 npm install @ravanscafi/redux-undo-actions
 ```
 
+## Breaking changes in 0.1
+
+Version 0.1 makes stored history immutable by default.
+Tracked actions, hydrated histories, and preloaded Redux history state are
+copied and deeply frozen. The public history types are readonly, and stored
+actions are copies rather than the original objects passed to `dispatch`.
+
+With the default `immutableHistory: true`, tracked actions must contain only
+primitives, arrays, and plain objects with data properties. Class instances
+(including `Date`, `Map`, and `Set`), functions, and accessor properties are
+rejected with a path to the unsupported value. Convert those values to plain
+data when possible. Otherwise, set `immutableHistory: false`; actions will be
+stored by reference and Redux Toolkit will inspect the full history on each
+dispatch in development.
+
+Persistence still uses JSON. Cycles, `bigint`, symbol-valued properties, and
+other values unsupported by `JSON.stringify` must not be used in persisted
+histories, even though non-persisted immutable history can preserve cycles,
+shared references, and symbol-keyed data.
+
 ## Quick Start
 
 ```typescript
@@ -138,6 +158,10 @@ Each wrapped reducer exposes the following shape:
 - trackedActions: string[]
   - Which Redux action types to track in history.
   - Default: [] (track all actions)
+- immutableHistory?: boolean
+  - Copies and deeply freezes tracked actions before storing them.
+  - Default: true.
+  - Set to false if an action contains non-plain values.
 - undoableActions: string[]
   - Which tracked actions are undoable/redone.
   - Default: [] (all tracked actions are undoable)
@@ -278,6 +302,12 @@ const selectCanRedo = (s: RootState) => {
 - Action-based history
   - The library stores a list of actions with an undone flag, not
     past/present/future state snapshots.
+  - Tracked actions are copied and deeply frozen. Later changes to the object
+    passed to `dispatch` do not affect replay, and immutable-state middleware
+    can skip the frozen history.
+  - History actions support primitives, arrays, and plain objects. Class
+    instances, functions, and accessor properties are rejected because they
+    cannot be copied safely for replay.
   - present is always computed by your reducer; on undo/redo, we either replay
     from snapshot or apply a minimal step when possible.
 - Undo/Redo semantics

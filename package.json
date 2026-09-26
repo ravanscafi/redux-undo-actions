@@ -1,6 +1,6 @@
 {
   "name": "@ravanscafi/redux-undo-actions",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Batteries-included undo/redo for Redux by tracking dispatched actions, enabling event-sourcing and replay capabilities.",
   "type": "module",
   "license": "MIT",

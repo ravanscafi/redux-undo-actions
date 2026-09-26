@@ -9,11 +9,11 @@ export interface HistoryAction<Action extends UnknownAction> {
   /**
    * The Redux action that was dispatched.
    */
-  action: Action
+  readonly action: Action
   /**
    * Indicates whether this action was undone during history tracking.
    */
-  undone: boolean
+  readonly undone: boolean
 }
 
 /**
@@ -29,7 +29,7 @@ export interface History<State, Action extends UnknownAction> {
   /**
    * List of actions in the history stack.
    */
-  actions: HistoryAction<Action>[]
+  actions: readonly HistoryAction<Action>[]
   /**
    * The initial state snapshot from when tracking started.
    */
@@ -172,6 +172,12 @@ export interface StoragePersistor {
  */
 export interface UndoableActionsConfig {
   /**
+   * Copy and freeze tracked actions before storing them.
+   * Set this to false if an action contains non-plain values.
+   * @default true
+   */
+  immutableHistory?: boolean
+  /**
    * Specifies which Redux action types should be tracked in the history.
    * If omitted, all actions will be tracked, which may include actions from other reducers.
    * For best results, provide only the relevant action types.
@@ -246,6 +252,18 @@ export interface UndoableActionsConfig {
 export type PersistedUndoableActionsConfig = UndoableActionsConfig & {
   persistence: Persistence
 }
+
+export type ResolvedUndoableActionsConfig = Omit<
+  UndoableActionsConfig,
+  'immutableHistory'
+> & {
+  immutableHistory: boolean
+}
+
+export type ResolvedPersistedUndoableActionsConfig =
+  ResolvedUndoableActionsConfig & {
+    persistence: Persistence
+  }
 
 /**
  * Partial configuration for undoable actions.

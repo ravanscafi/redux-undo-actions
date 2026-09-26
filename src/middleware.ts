@@ -1,11 +1,11 @@
 import { isAction, type Middleware, type UnknownAction } from 'redux'
-import type { History, PersistedUndoableActionsConfig } from './types'
+import type { History, ResolvedPersistedUndoableActionsConfig } from './types'
 import { isActionTracked } from './utils'
 import { loadHistory, removeHistory, saveHistory } from './storage'
 import { HISTORY_KEY } from './actions'
 
 export default function createPersistenceMiddleware(
-  config: PersistedUndoableActionsConfig,
+  config: ResolvedPersistedUndoableActionsConfig,
 ): Middleware {
   const { reducerKey, getStorageKey, storage, dispatchAfterMaybeLoading } =
     config.persistence

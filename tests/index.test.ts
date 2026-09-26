@@ -7,6 +7,7 @@ import {
   ActionTypes,
   type HistoryAction,
   type HistoryState,
+  type UndoableActionsConfig,
   undoableActions,
 } from '../src'
 import { HISTORY_KEY } from '../src/actions'
@@ -271,6 +272,306 @@ describe.concurrent('undoableActions', () => {
       ])
     },
   )
+})
+
+describe('immutable action history', () => {
+  const amountReducer = (
+    state = { total: 0 },
+    action: UnknownAction,
+  ): { total: number } => {
+    if (action.type !== 'amount/add') {
+      return state
+    }
+    const payload = action.payload as { amount: number }
+    return { total: state.total + payload.amount }
+  }
+
+  it('copies and deeply freezes tracked actions', () => {
+    const store = createStore(
+      undoableActions(amountReducer, {
+        trackedActions: ['amount/add'],
+        undoableActions: ['amount/add'],
+      }),
+    )
+    expect(Object.isFrozen(store.getState()[HISTORY_KEY].actions)).toBe(true)
+
+    const action = {
+      type: 'amount/add',
+      payload: { amount: 2, labels: ['first'] },
+    }
+    store.dispatch(action)
+
+    const actions = store.getState()[HISTORY_KEY].actions
+    const captured = actions[0]
+    const capturedPayload = captured.action.payload as {
+      amount: number
+      labels: string[]
+    }
+
+    expect(Object.isFrozen(actions)).toBe(true)
+    expect(Object.isFrozen(captured)).toBe(true)
+    expect(Object.isFrozen(captured.action)).toBe(true)
+    expect(Object.isFrozen(capturedPayload)).toBe(true)
+    expect(Object.isFrozen(capturedPayload.labels)).toBe(true)
+    expect(captured.action).not.toBe(action)
+    expect(capturedPayload).not.toBe(action.payload)
+    expect(Object.isFrozen(action)).toBe(false)
+    expect(Object.isFrozen(action.payload)).toBe(false)
+
+    action.payload.amount = 50
+    action.payload.labels.push('mutated later')
+
+    expect(capturedPayload).toEqual({ amount: 2, labels: ['first'] })
+    store.dispatch(ActionCreators.undo())
+    store.dispatch(ActionCreators.redo())
+    expect(store.getState().present.total).toBe(2)
+    expect(Object.isFrozen(store.getState()[HISTORY_KEY].actions)).toBe(true)
+    expect(Object.isFrozen(store.getState()[HISTORY_KEY].actions[0])).toBe(true)
+  })
+
+  it('copies and freezes hydrated history', () => {
+    const store = createStore(
+      undoableActions(amountReducer, {
+        trackedActions: ['amount/add'],
+        undoableActions: ['amount/add'],
+      }),
+    )
+    const payload = {
+      tracking: true,
+      actions: [
+        {
+          action: { type: 'amount/add', payload: { amount: 3 } },
+          undone: true,
+        },
+      ],
+    }
+
+    store.dispatch(ActionCreators.hydrate(payload))
+    const captured = store.getState()[HISTORY_KEY].actions[0]
+    const capturedPayload = captured.action.payload as { amount: number }
+
+    expect(store.getState().present.total).toBe(0)
+    expect(captured).not.toBe(payload.actions[0])
+    expect(captured.action).not.toBe(payload.actions[0].action)
+    expect(Object.isFrozen(store.getState()[HISTORY_KEY].actions)).toBe(true)
+    expect(Object.isFrozen(capturedPayload)).toBe(true)
+
+    payload.actions[0].action.payload.amount = 100
+    store.dispatch(ActionCreators.redo())
+    expect(store.getState().present.total).toBe(3)
+  })
+
+  it('normalizes and owns history supplied as preloaded Redux state', () => {
+    const preloadedAction = {
+      type: 'amount/add',
+      payload: { amount: 4 },
+    }
+    const preloadedActions = Object.freeze([
+      { action: preloadedAction, undone: false },
+    ])
+    const preloadedState: HistoryState<{ total: number }, UnknownAction> = {
+      present: { total: 4 },
+      canUndo: true,
+      canRedo: false,
+      [HISTORY_KEY]: {
+        tracking: true,
+        actions: preloadedActions,
+        snapshot: { total: 0 },
+      },
+    }
+
+    const store = createStore(
+      undoableActions(amountReducer, {
+        trackedActions: ['amount/add'],
+        undoableActions: ['amount/add'],
+      }),
+      preloadedState,
+    )
+
+    const capturedActions = store.getState()[HISTORY_KEY].actions
+    const capturedPayload = capturedActions[0].action.payload as {
+      amount: number
+    }
+    expect(capturedActions).not.toBe(preloadedState[HISTORY_KEY].actions)
+    expect(capturedActions[0].action).not.toBe(preloadedAction)
+    expect(Object.isFrozen(capturedActions)).toBe(true)
+    expect(Object.isFrozen(capturedActions[0])).toBe(true)
+    expect(Object.isFrozen(capturedActions[0].action)).toBe(true)
+    expect(Object.isFrozen(capturedPayload)).toBe(true)
+
+    preloadedAction.payload.amount = 100
+    store.dispatch(ActionCreators.undo())
+    expect(store.getState().present.total).toBe(0)
+    store.dispatch(ActionCreators.redo())
+    expect(store.getState().present.total).toBe(4)
+  })
+
+  it('preserves sparse arrays and their own data properties', () => {
+    const metadataKey = Symbol('metadata')
+    type EnrichedArray = unknown[] & {
+      label: { value: string }
+      [metadataKey]: { value: string }
+    }
+    const shapeReducer = (state = 'initial', action: UnknownAction): string => {
+      if (action.type !== 'shape/read') {
+        return state
+      }
+      const payload = action.payload as EnrichedArray
+      return [
+        0 in payload,
+        payload.length,
+        payload.label.value,
+        payload[metadataKey].value,
+      ].join(':')
+    }
+    const payload = new Array(2) as EnrichedArray
+    payload[1] = { value: 'second' }
+    Object.defineProperty(payload, 'label', {
+      configurable: true,
+      enumerable: false,
+      value: { value: 'label' },
+      writable: true,
+    })
+    payload[metadataKey] = { value: 'symbol' }
+    const store = createStore(
+      undoableActions(shapeReducer, {
+        trackedActions: ['shape/read'],
+        undoableActions: ['shape/read'],
+      }),
+    )
+
+    store.dispatch({ type: 'shape/read', payload })
+
+    const capturedPayload = store.getState()[HISTORY_KEY].actions[0].action
+      .payload as EnrichedArray
+    expect(0 in capturedPayload).toBe(false)
+    expect(1 in capturedPayload).toBe(true)
+    expect(capturedPayload).toHaveLength(2)
+    expect(
+      Object.getOwnPropertyDescriptor(capturedPayload, 'label'),
+    ).toMatchObject({ enumerable: false, writable: false })
+    expect(capturedPayload.label).toEqual({ value: 'label' })
+    expect(capturedPayload[metadataKey]).toEqual({ value: 'symbol' })
+    expect(Object.isFrozen(capturedPayload.label)).toBe(true)
+    expect(Object.isFrozen(capturedPayload[metadataKey])).toBe(true)
+
+    payload[0] = 'added later'
+    payload.label.value = 'changed'
+    payload[metadataKey].value = 'changed'
+    store.dispatch(ActionCreators.undo())
+    store.dispatch(ActionCreators.redo())
+    expect(store.getState().present).toBe('false:2:label:symbol')
+  })
+
+  it('preserves cycles and shared references in non-persisted history', () => {
+    const shared = { value: 'shared' }
+    const payload: {
+      amount: number
+      left: { value: string }
+      right: { value: string }
+      self?: unknown
+    } = { amount: 1, left: shared, right: shared }
+    payload.self = payload
+    const store = createStore(
+      undoableActions(amountReducer, { trackedActions: ['amount/add'] }),
+    )
+
+    store.dispatch({ type: 'amount/add', payload })
+
+    const capturedPayload = store.getState()[HISTORY_KEY].actions[0].action
+      .payload as typeof payload
+    expect(capturedPayload).not.toBe(payload)
+    expect(capturedPayload.self).toBe(capturedPayload)
+    expect(capturedPayload.left).toBe(capturedPayload.right)
+    expect(capturedPayload.left).not.toBe(shared)
+    expect(Object.isFrozen(capturedPayload)).toBe(true)
+    expect(Object.isFrozen(capturedPayload.left)).toBe(true)
+  })
+
+  it('rejects non-plain action history values with their path', () => {
+    const reducer = undoableActions(amountReducer, {
+      trackedActions: ['amount/add'],
+    })
+    const store = createStore(reducer)
+
+    expect(() =>
+      store.dispatch({
+        type: 'amount/add',
+        payload: { amount: 1, createdAt: new Date() },
+      }),
+    ).toThrow('Cannot store non-plain value at action.payload.createdAt')
+  })
+
+  it('allows opting out for non-plain action payload compatibility', () => {
+    const reducer = undoableActions(amountReducer, {
+      immutableHistory: false,
+      trackedActions: ['amount/add'],
+    })
+    const store = createStore(reducer)
+    const action = {
+      type: 'amount/add',
+      payload: { amount: 1, createdAt: new Date() },
+    }
+
+    store.dispatch(action)
+
+    const actions = store.getState()[HISTORY_KEY].actions
+    expect(actions[0].action).toBe(action)
+    expect(Object.isFrozen(actions)).toBe(false)
+    expect(Object.isFrozen(actions[0])).toBe(false)
+  })
+
+  it('retains every action in a long history', () => {
+    const store = createStore(
+      undoableActions(amountReducer, {
+        trackedActions: ['amount/add'],
+        undoableActions: ['amount/add'],
+      }),
+    )
+
+    for (let index = 1; index <= 1_000; index += 1) {
+      store.dispatch({ type: 'amount/add', payload: { amount: index } })
+    }
+
+    const actions = store.getState()[HISTORY_KEY].actions
+    expect(actions).toHaveLength(1_000)
+    expect(actions[0].action.payload).toEqual({ amount: 1 })
+    expect(actions.at(-1)?.action.payload).toEqual({ amount: 1_000 })
+    expect(actions.every((action) => Object.isFrozen(action))).toBe(true)
+    expect(Object.isFrozen(actions)).toBe(true)
+  })
+
+  it('keeps immutableHistory optional in the full public config type', () => {
+    const config: UndoableActionsConfig = {
+      trackedActions: ['amount/add'],
+      undoableActions: ['amount/add'],
+      internalActions: {
+        undo: 'history/undo',
+        redo: 'history/redo',
+        reset: 'history/reset',
+        hydrate: 'history/hydrate',
+        tracking: 'history/tracking',
+      },
+    }
+    const store = createStore(undoableActions(amountReducer, config))
+
+    store.dispatch({ type: 'amount/add', payload: { amount: 1 } })
+
+    expect(Object.isFrozen(store.getState()[HISTORY_KEY].actions)).toBe(true)
+  })
+
+  it('uses the immutable default when the optional setting is undefined', () => {
+    const store = createStore(
+      undoableActions(amountReducer, {
+        immutableHistory: undefined,
+        trackedActions: ['amount/add'],
+      }),
+    )
+
+    store.dispatch({ type: 'amount/add', payload: { amount: 1 } })
+
+    expect(Object.isFrozen(store.getState()[HISTORY_KEY].actions)).toBe(true)
+  })
 })
 
 describe.concurrent('undoableActions with custom config', () => {

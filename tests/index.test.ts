@@ -30,7 +30,11 @@ const counterReducer = (
     case 'counter/start':
       return { ...state, count: action.payload as number }
     case 'counter/changeName':
-      return { ...state, name: action.payload as string }
+      return state.name === action.payload
+        ? state
+        : { ...state, name: action.payload as string }
+    case 'counter/clone':
+      return { ...state }
     default:
       return state
   }
@@ -272,6 +276,16 @@ describe.concurrent('undoableActions', () => {
       ])
     },
   )
+
+  it.concurrent('tracks a new state reference with equal values', () => {
+    const store = createStore(undoableActions(counterReducer))
+
+    store.dispatch({ type: 'counter/clone' })
+
+    expectHistoryActions(store, [
+      { action: { type: 'counter/clone' }, undone: false },
+    ])
+  })
 })
 
 describe('immutable action history', () => {

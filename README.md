@@ -24,6 +24,13 @@ event-sourcing and replay capabilities.
 npm install @ravanscafi/redux-undo-actions
 ```
 
+## Breaking changes in 0.2
+
+Version 0.2 uses reference equality to identify actions that did not change
+state. Reducers must follow the standard Redux convention of returning the
+existing state object when an action has no effect. Returning a new object with
+equal values is treated as a state change and the action is added to history.
+
 ## Breaking changes in 0.1
 
 Version 0.1 makes stored history immutable by default.
@@ -324,7 +331,8 @@ const selectCanRedo = (s: RootState) => {
     present, and replays to compute the new present.
 - Guardrails
   - trackedActions and undoableActions default to [] which means “all”.
-  - No-op actions that don’t change state (deepEqual) are ignored for history.
+  - No-op actions are not recorded in history when the reducer returns the
+    existing state reference.
 
 ## Comparison with [redux-undo](https://github.com/omnidan/redux-undo)
 

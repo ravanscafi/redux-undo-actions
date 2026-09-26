@@ -6,13 +6,7 @@ import type {
   HistoryState,
   ResolvedUndoableActionsConfig,
 } from './types'
-import {
-  canRedo,
-  canUndo,
-  deepEqual,
-  isActionTracked,
-  isActionUndoable,
-} from './utils'
+import { canRedo, canUndo, isActionTracked, isActionUndoable } from './utils'
 import { HISTORY_KEY } from './actions'
 import {
   captureHistoryAction,
@@ -242,7 +236,7 @@ function handleAction<State, Action extends UnknownAction>(
   if (
     !tracking ||
     !isActionTracked(config, action) ||
-    deepEqual(newPresent, present) // no change in state
+    Object.is(newPresent, present)
   ) {
     return {
       ...state,
@@ -271,6 +265,7 @@ function handleAction<State, Action extends UnknownAction>(
     canRedo: canRedo(config, newActions),
   }
 }
+
 function hydrate<State, Action extends UnknownAction>(
   reducer: Reducer<State, Action>,
   config: ResolvedUndoableActionsConfig,

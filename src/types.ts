@@ -172,12 +172,8 @@ export interface StoragePersistor {
  */
 export interface UndoableActionsConfig {
   /**
-   * Copies tracked actions into library-owned deeply frozen plain data.
-   * This protects replay from later caller mutations and lets immutable-state
-   * middleware skip the action list efficiently.
-   *
-   * Disable this only when actions contain non-plain values that cannot be
-   * represented as deterministic immutable replay data.
+   * Copy and freeze tracked actions before storing them.
+   * Set this to false if an action contains non-plain values.
    * @default true
    */
   immutableHistory?: boolean
@@ -257,9 +253,6 @@ export type PersistedUndoableActionsConfig = UndoableActionsConfig & {
   persistence: Persistence
 }
 
-/**
- * Fully resolved configuration used internally after defaults are applied.
- */
 export type ResolvedUndoableActionsConfig = Omit<
   UndoableActionsConfig,
   'immutableHistory'
@@ -267,9 +260,6 @@ export type ResolvedUndoableActionsConfig = Omit<
   immutableHistory: boolean
 }
 
-/**
- * Fully resolved persistence configuration used internally.
- */
 export type ResolvedPersistedUndoableActionsConfig =
   ResolvedUndoableActionsConfig & {
     persistence: Persistence

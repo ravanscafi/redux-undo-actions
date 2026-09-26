@@ -250,8 +250,6 @@ function handleAction<State, Action extends UnknownAction>(
     }
   }
 
-  // A new undoable action starts a new branch, so abandoned future actions
-  // are removed from replay history before appending the captured action.
   const retainedActions = isActionUndoable(config, action)
     ? actions.filter((historyAction) => !historyAction.undone)
     : actions

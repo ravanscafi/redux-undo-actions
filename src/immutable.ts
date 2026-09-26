@@ -1,16 +1,10 @@
 import type { UnknownAction } from 'redux'
 import type { HistoryAction } from './types'
 
+// A frozen array can still contain mutable entries. Only arrays recorded here
+// can be reused without checking every action again.
 const capturedHistoryArrays = new WeakSet<object>()
 
-/**
- * Capture a Redux action as library-owned immutable plain data.
- *
- * Action history is replayed later and may outlive the object originally
- * passed to dispatch. Copying here prevents later caller mutations from
- * changing replay behavior. Persisted histories already require the same
- * plain-data constraint in order to survive JSON serialization.
- */
 export function captureHistoryAction<Action extends UnknownAction>(
   action: Action,
   undone = false,
@@ -26,10 +20,6 @@ export function captureHistoryAction<Action extends UnknownAction>(
   })
 }
 
-/**
- * Replace metadata on an action already owned by the history without copying
- * its immutable action payload again.
- */
 export function setHistoryActionUndone<Action extends UnknownAction>(
   historyAction: HistoryAction<Action>,
   undone: boolean,
@@ -39,9 +29,6 @@ export function setHistoryActionUndone<Action extends UnknownAction>(
   return immutable ? Object.freeze(next) : next
 }
 
-/**
- * Freeze a newly-created history array. Its entries must already be immutable.
- */
 export function freezeHistoryActions<Action extends UnknownAction>(
   actions: HistoryAction<Action>[],
   immutable = true,
@@ -55,20 +42,12 @@ export function freezeHistoryActions<Action extends UnknownAction>(
   return frozenActions
 }
 
-/**
- * Check whether a history array was captured by this module. Object.freeze()
- * alone is not enough: an externally-created frozen array may still contain
- * mutable action objects.
- */
 export function isCapturedHistoryActions(
   actions: readonly HistoryAction<UnknownAction>[],
 ): boolean {
   return capturedHistoryArrays.has(actions)
 }
 
-/**
- * Capture externally-owned history, such as a hydration payload.
- */
 export function captureHistoryActions<Action extends UnknownAction>(
   actions: readonly HistoryAction<Action>[],
   immutable = true,

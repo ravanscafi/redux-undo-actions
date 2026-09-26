@@ -286,7 +286,7 @@ describe('immutable action history', () => {
     return { total: state.total + payload.amount }
   }
 
-  it('captures library-owned deeply immutable action data', () => {
+  it('copies and deeply freezes tracked actions', () => {
     const store = createStore(
       undoableActions(amountReducer, {
         trackedActions: ['amount/add'],
@@ -329,7 +329,7 @@ describe('immutable action history', () => {
     expect(Object.isFrozen(store.getState()[HISTORY_KEY].actions[0])).toBe(true)
   })
 
-  it('copies and freezes externally-owned hydration history', () => {
+  it('copies and freezes hydrated history', () => {
     const store = createStore(
       undoableActions(amountReducer, {
         trackedActions: ['amount/add'],
